@@ -49,6 +49,7 @@ fn update(model: Model, msg: Msg) -> Model {
 
 // VIEW ------------------------------------------------------------------------
 fn view(model: Model) -> Element(Msg) {
+    let index_list_str : List(String) =[]
   html.div([attribute.class("p-32 mx-auto w-full max-w-2xl space-y-4")], [
     html.label([attribute.class("flex gap-2")], [
       html.span([], [html.text("Rechercher un bouquin : ")]),
@@ -61,7 +62,7 @@ fn view(model: Model) -> Element(Msg) {
     ]),
     html.p([], [
       html.text("Hello there, "),
-      html.text(string.join(index.nearest_string_with_levenshtein_distance(model,index_list_str),with:"\n")),
+      html.text(string.join(levenshtein.nearest_string_with_levenshtein_distance(model,index_list_str),with:"\n")),
       html.text("!"),
     ])
   ])

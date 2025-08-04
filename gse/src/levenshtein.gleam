@@ -35,12 +35,17 @@ fn levenshtein_helper(a: List(String), b: List(String), len_a: Int, len_b: Int) 
 
 pub fn nearest_string_with_levenshtein_distance(req:String,list_str:List(String))->String
 {
-    let l = list.map(list_str,fn(x:String){#(levenshtein(req,x),x)})
-    let sorted_l = list.sort(l,by:fn(x,y){case x.0<y.0
-                                  {True->order.Lt
-                                  False->order.Gt}})
-    sorted_l[0].0
+    //Check the return type of this variable
+    todo
 }
+// pub fn nearest_string_with_levenshtein_distance(req:String,list_str:List(String))->String
+// {
+//     let l = list.map(list_str,fn(x:String){#(levenshtein(req,x),x)})
+//     let sorted_l = list.sort(l,by:fn(x,y){case x.0<y.0
+//                                   {True->order.Lt
+//                                   False->order.Gt}})
+//     sorted_l[0]
+// }
 
 
 // Example usage

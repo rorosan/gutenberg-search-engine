@@ -4,7 +4,6 @@
 
 import gleam/dict
 import gleam/list
-//import gleam/set
 import gleam/string
 
 // type Book {
@@ -45,6 +44,9 @@ pub fn create_inverted_index(
   }
 }
 
+pub fn autocomplete()
+{todo}
+
 pub fn main() {
    let list_book_names = [
         "A Room with a View by E. M. Forster (4931)",
@@ -59,7 +61,6 @@ pub fn main() {
         "A The Enchanted April by Elizabeth Von Arnim (3279)",
         "The Imaginary Invalid by Molière (3177)"
     ]
-  let index_list_str = create_inverted_index(list_book_names)
-  echo res |> dict.keys
-  let index_list_str =
+  let index_list = create_inverted_index(list_book_names)
+  echo index_list |> dict.keys
 }
