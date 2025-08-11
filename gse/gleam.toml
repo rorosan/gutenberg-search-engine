@@ -14,7 +14,8 @@ repository = { type = "github", user = "rorosan", repo = "gutenberg-search-engin
 
 [dependencies]
 gleam_stdlib = ">= 0.62.0 and < 1.0.0"
-lustre = ">= 5.2.1 and < 6.0.0"
+lustre = ">= 5.3.0 and < 6.0.0"
+lustre_pipes = ">= 0.3.0 and < 1.0.0"
 [dev-dependencies]
 gleeunit = ">= 1.0.0 and < 2.0.0"
 lustre_dev_tools = ">= 1.6.5 and < 2.0.0"

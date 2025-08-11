@@ -44,8 +44,8 @@ pub fn create_inverted_index(
   }
 }
 
-pub fn autocomplete()
-{todo}
+// pub fn autocomplete()
+// {todo}
 
 pub fn main() {
    let list_book_names = [

@@ -36,16 +36,16 @@ var List = class {
   // @internal
   countLength() {
     let current = this;
-    let length2 = 0;
+    let length3 = 0;
     while (current) {
       current = current.tail;
-      length2++;
+      length3++;
     }
-    return length2 - 1;
+    return length3 - 1;
   }
 };
-function prepend(element3, tail) {
-  return new NonEmpty(element3, tail);
+function prepend(element4, tail) {
+  return new NonEmpty(element4, tail);
 }
 function toList(elements, tail) {
   return List.fromArray(elements, tail);
@@ -257,11 +257,6 @@ function bitArrayByteAt(buffer, bitOffset, index4) {
     return a | b;
   }
 }
-var UtfCodepoint = class {
-  constructor(value2) {
-    this.value = value2;
-  }
-};
 var isBitArrayDeprecationMessagePrinted = {};
 function bitArrayPrintDeprecationWarning(name, message) {
   if (isBitArrayDeprecationMessagePrinted[name]) {
@@ -271,277 +266,6 @@ function bitArrayPrintDeprecationWarning(name, message) {
     `Deprecated BitArray.${name} property used in JavaScript FFI code. ${message}.`
   );
   isBitArrayDeprecationMessagePrinted[name] = true;
-}
-function bitArraySlice(bitArray, start4, end) {
-  end ??= bitArray.bitSize;
-  bitArrayValidateRange(bitArray, start4, end);
-  if (start4 === end) {
-    return new BitArray(new Uint8Array());
-  }
-  if (start4 === 0 && end === bitArray.bitSize) {
-    return bitArray;
-  }
-  start4 += bitArray.bitOffset;
-  end += bitArray.bitOffset;
-  const startByteIndex = Math.trunc(start4 / 8);
-  const endByteIndex = Math.trunc((end + 7) / 8);
-  const byteLength = endByteIndex - startByteIndex;
-  let buffer;
-  if (startByteIndex === 0 && byteLength === bitArray.rawBuffer.byteLength) {
-    buffer = bitArray.rawBuffer;
-  } else {
-    buffer = new Uint8Array(
-      bitArray.rawBuffer.buffer,
-      bitArray.rawBuffer.byteOffset + startByteIndex,
-      byteLength
-    );
-  }
-  return new BitArray(buffer, end - start4, start4 % 8);
-}
-function bitArraySliceToInt(bitArray, start4, end, isBigEndian, isSigned) {
-  bitArrayValidateRange(bitArray, start4, end);
-  if (start4 === end) {
-    return 0;
-  }
-  start4 += bitArray.bitOffset;
-  end += bitArray.bitOffset;
-  const isStartByteAligned = start4 % 8 === 0;
-  const isEndByteAligned = end % 8 === 0;
-  if (isStartByteAligned && isEndByteAligned) {
-    return intFromAlignedSlice(
-      bitArray,
-      start4 / 8,
-      end / 8,
-      isBigEndian,
-      isSigned
-    );
-  }
-  const size2 = end - start4;
-  const startByteIndex = Math.trunc(start4 / 8);
-  const endByteIndex = Math.trunc((end - 1) / 8);
-  if (startByteIndex == endByteIndex) {
-    const mask2 = 255 >> start4 % 8;
-    const unusedLowBitCount = (8 - end % 8) % 8;
-    let value2 = (bitArray.rawBuffer[startByteIndex] & mask2) >> unusedLowBitCount;
-    if (isSigned) {
-      const highBit = 2 ** (size2 - 1);
-      if (value2 >= highBit) {
-        value2 -= highBit * 2;
-      }
-    }
-    return value2;
-  }
-  if (size2 <= 53) {
-    return intFromUnalignedSliceUsingNumber(
-      bitArray.rawBuffer,
-      start4,
-      end,
-      isBigEndian,
-      isSigned
-    );
-  } else {
-    return intFromUnalignedSliceUsingBigInt(
-      bitArray.rawBuffer,
-      start4,
-      end,
-      isBigEndian,
-      isSigned
-    );
-  }
-}
-function intFromAlignedSlice(bitArray, start4, end, isBigEndian, isSigned) {
-  const byteSize = end - start4;
-  if (byteSize <= 6) {
-    return intFromAlignedSliceUsingNumber(
-      bitArray.rawBuffer,
-      start4,
-      end,
-      isBigEndian,
-      isSigned
-    );
-  } else {
-    return intFromAlignedSliceUsingBigInt(
-      bitArray.rawBuffer,
-      start4,
-      end,
-      isBigEndian,
-      isSigned
-    );
-  }
-}
-function intFromAlignedSliceUsingNumber(buffer, start4, end, isBigEndian, isSigned) {
-  const byteSize = end - start4;
-  let value2 = 0;
-  if (isBigEndian) {
-    for (let i = start4; i < end; i++) {
-      value2 *= 256;
-      value2 += buffer[i];
-    }
-  } else {
-    for (let i = end - 1; i >= start4; i--) {
-      value2 *= 256;
-      value2 += buffer[i];
-    }
-  }
-  if (isSigned) {
-    const highBit = 2 ** (byteSize * 8 - 1);
-    if (value2 >= highBit) {
-      value2 -= highBit * 2;
-    }
-  }
-  return value2;
-}
-function intFromAlignedSliceUsingBigInt(buffer, start4, end, isBigEndian, isSigned) {
-  const byteSize = end - start4;
-  let value2 = 0n;
-  if (isBigEndian) {
-    for (let i = start4; i < end; i++) {
-      value2 *= 256n;
-      value2 += BigInt(buffer[i]);
-    }
-  } else {
-    for (let i = end - 1; i >= start4; i--) {
-      value2 *= 256n;
-      value2 += BigInt(buffer[i]);
-    }
-  }
-  if (isSigned) {
-    const highBit = 1n << BigInt(byteSize * 8 - 1);
-    if (value2 >= highBit) {
-      value2 -= highBit * 2n;
-    }
-  }
-  return Number(value2);
-}
-function intFromUnalignedSliceUsingNumber(buffer, start4, end, isBigEndian, isSigned) {
-  const isStartByteAligned = start4 % 8 === 0;
-  let size2 = end - start4;
-  let byteIndex = Math.trunc(start4 / 8);
-  let value2 = 0;
-  if (isBigEndian) {
-    if (!isStartByteAligned) {
-      const leadingBitsCount = 8 - start4 % 8;
-      value2 = buffer[byteIndex++] & (1 << leadingBitsCount) - 1;
-      size2 -= leadingBitsCount;
-    }
-    while (size2 >= 8) {
-      value2 *= 256;
-      value2 += buffer[byteIndex++];
-      size2 -= 8;
-    }
-    if (size2 > 0) {
-      value2 *= 2 ** size2;
-      value2 += buffer[byteIndex] >> 8 - size2;
-    }
-  } else {
-    if (isStartByteAligned) {
-      let size3 = end - start4;
-      let scale = 1;
-      while (size3 >= 8) {
-        value2 += buffer[byteIndex++] * scale;
-        scale *= 256;
-        size3 -= 8;
-      }
-      value2 += (buffer[byteIndex] >> 8 - size3) * scale;
-    } else {
-      const highBitsCount = start4 % 8;
-      const lowBitsCount = 8 - highBitsCount;
-      let size3 = end - start4;
-      let scale = 1;
-      while (size3 >= 8) {
-        const byte = buffer[byteIndex] << highBitsCount | buffer[byteIndex + 1] >> lowBitsCount;
-        value2 += (byte & 255) * scale;
-        scale *= 256;
-        size3 -= 8;
-        byteIndex++;
-      }
-      if (size3 > 0) {
-        const lowBitsUsed = size3 - Math.max(0, size3 - lowBitsCount);
-        let trailingByte = (buffer[byteIndex] & (1 << lowBitsCount) - 1) >> lowBitsCount - lowBitsUsed;
-        size3 -= lowBitsUsed;
-        if (size3 > 0) {
-          trailingByte *= 2 ** size3;
-          trailingByte += buffer[byteIndex + 1] >> 8 - size3;
-        }
-        value2 += trailingByte * scale;
-      }
-    }
-  }
-  if (isSigned) {
-    const highBit = 2 ** (end - start4 - 1);
-    if (value2 >= highBit) {
-      value2 -= highBit * 2;
-    }
-  }
-  return value2;
-}
-function intFromUnalignedSliceUsingBigInt(buffer, start4, end, isBigEndian, isSigned) {
-  const isStartByteAligned = start4 % 8 === 0;
-  let size2 = end - start4;
-  let byteIndex = Math.trunc(start4 / 8);
-  let value2 = 0n;
-  if (isBigEndian) {
-    if (!isStartByteAligned) {
-      const leadingBitsCount = 8 - start4 % 8;
-      value2 = BigInt(buffer[byteIndex++] & (1 << leadingBitsCount) - 1);
-      size2 -= leadingBitsCount;
-    }
-    while (size2 >= 8) {
-      value2 *= 256n;
-      value2 += BigInt(buffer[byteIndex++]);
-      size2 -= 8;
-    }
-    if (size2 > 0) {
-      value2 <<= BigInt(size2);
-      value2 += BigInt(buffer[byteIndex] >> 8 - size2);
-    }
-  } else {
-    if (isStartByteAligned) {
-      let size3 = end - start4;
-      let shift = 0n;
-      while (size3 >= 8) {
-        value2 += BigInt(buffer[byteIndex++]) << shift;
-        shift += 8n;
-        size3 -= 8;
-      }
-      value2 += BigInt(buffer[byteIndex] >> 8 - size3) << shift;
-    } else {
-      const highBitsCount = start4 % 8;
-      const lowBitsCount = 8 - highBitsCount;
-      let size3 = end - start4;
-      let shift = 0n;
-      while (size3 >= 8) {
-        const byte = buffer[byteIndex] << highBitsCount | buffer[byteIndex + 1] >> lowBitsCount;
-        value2 += BigInt(byte & 255) << shift;
-        shift += 8n;
-        size3 -= 8;
-        byteIndex++;
-      }
-      if (size3 > 0) {
-        const lowBitsUsed = size3 - Math.max(0, size3 - lowBitsCount);
-        let trailingByte = (buffer[byteIndex] & (1 << lowBitsCount) - 1) >> lowBitsCount - lowBitsUsed;
-        size3 -= lowBitsUsed;
-        if (size3 > 0) {
-          trailingByte <<= size3;
-          trailingByte += buffer[byteIndex + 1] >> 8 - size3;
-        }
-        value2 += BigInt(trailingByte) << shift;
-      }
-    }
-  }
-  if (isSigned) {
-    const highBit = 2n ** BigInt(end - start4 - 1);
-    if (value2 >= highBit) {
-      value2 -= highBit * 2n;
-    }
-  }
-  return Number(value2);
-}
-function bitArrayValidateRange(bitArray, start4, end) {
-  if (start4 < 0 || start4 > bitArray.bitSize || end < start4 || end > bitArray.bitSize) {
-    const msg = `Invalid bit array slice: start = ${start4}, end = ${end}, bit size = ${bitArray.bitSize}`;
-    throw new globalThis.Error(msg);
-  }
 }
 var Result = class _Result extends CustomType {
   // @internal
@@ -587,7 +311,10 @@ function isEqual(x, y) {
       }
     }
     let [keys2, get2] = getters(a);
-    for (let k of keys2(a)) {
+    const ka = keys2(a);
+    const kb = keys2(b);
+    if (ka.length !== kb.length) return false;
+    for (let k of ka) {
       values3.push(get2(a, k), get2(b, k));
     }
   }
@@ -640,6 +367,16 @@ function makeError(variant, file, module, line, fn, message, extra) {
   for (let k in extra) error[k] = extra[k];
   return error;
 }
+
+// build/dev/javascript/gleam_stdlib/gleam/option.mjs
+var Some = class extends CustomType {
+  constructor($0) {
+    super();
+    this[0] = $0;
+  }
+};
+var None = class extends CustomType {
+};
 
 // build/dev/javascript/gleam_stdlib/dict.mjs
 var referenceMap = /* @__PURE__ */ new WeakMap();
@@ -1345,16 +1082,6 @@ var Dict = class _Dict {
 };
 var unequalDictSymbol = /* @__PURE__ */ Symbol();
 
-// build/dev/javascript/gleam_stdlib/gleam/option.mjs
-var Some = class extends CustomType {
-  constructor($0) {
-    super();
-    this[0] = $0;
-  }
-};
-var None = class extends CustomType {
-};
-
 // build/dev/javascript/gleam_stdlib/gleam/order.mjs
 var Lt = class extends CustomType {
 };
@@ -1362,6 +1089,335 @@ var Eq = class extends CustomType {
 };
 var Gt = class extends CustomType {
 };
+
+// build/dev/javascript/gleam_stdlib/gleam/dynamic/decode.mjs
+var DecodeError = class extends CustomType {
+  constructor(expected, found, path) {
+    super();
+    this.expected = expected;
+    this.found = found;
+    this.path = path;
+  }
+};
+var Decoder = class extends CustomType {
+  constructor(function$) {
+    super();
+    this.function = function$;
+  }
+};
+function run(data, decoder) {
+  let $ = decoder.function(data);
+  let maybe_invalid_data;
+  let errors;
+  maybe_invalid_data = $[0];
+  errors = $[1];
+  if (errors instanceof Empty) {
+    return new Ok(maybe_invalid_data);
+  } else {
+    return new Error(errors);
+  }
+}
+function success(data) {
+  return new Decoder((_) => {
+    return [data, toList([])];
+  });
+}
+function map2(decoder, transformer) {
+  return new Decoder(
+    (d) => {
+      let $ = decoder.function(d);
+      let data;
+      let errors;
+      data = $[0];
+      errors = $[1];
+      return [transformer(data), errors];
+    }
+  );
+}
+function run_decoders(loop$data, loop$failure, loop$decoders) {
+  while (true) {
+    let data = loop$data;
+    let failure2 = loop$failure;
+    let decoders = loop$decoders;
+    if (decoders instanceof Empty) {
+      return failure2;
+    } else {
+      let decoder = decoders.head;
+      let decoders$1 = decoders.tail;
+      let $ = decoder.function(data);
+      let layer;
+      let errors;
+      layer = $;
+      errors = $[1];
+      if (errors instanceof Empty) {
+        return layer;
+      } else {
+        loop$data = data;
+        loop$failure = failure2;
+        loop$decoders = decoders$1;
+      }
+    }
+  }
+}
+function one_of(first, alternatives) {
+  return new Decoder(
+    (dynamic_data) => {
+      let $ = first.function(dynamic_data);
+      let layer;
+      let errors;
+      layer = $;
+      errors = $[1];
+      if (errors instanceof Empty) {
+        return layer;
+      } else {
+        return run_decoders(dynamic_data, layer, alternatives);
+      }
+    }
+  );
+}
+function run_dynamic_function(data, name, f) {
+  let $ = f(data);
+  if ($ instanceof Ok) {
+    let data$1 = $[0];
+    return [data$1, toList([])];
+  } else {
+    let zero = $[0];
+    return [
+      zero,
+      toList([new DecodeError(name, classify_dynamic(data), toList([]))])
+    ];
+  }
+}
+function decode_int(data) {
+  return run_dynamic_function(data, "Int", int);
+}
+var int2 = /* @__PURE__ */ new Decoder(decode_int);
+function decode_string(data) {
+  return run_dynamic_function(data, "String", string);
+}
+var string2 = /* @__PURE__ */ new Decoder(decode_string);
+function push_path(layer, path) {
+  let decoder = one_of(
+    string2,
+    toList([
+      (() => {
+        let _pipe = int2;
+        return map2(_pipe, to_string);
+      })()
+    ])
+  );
+  let path$1 = map(
+    path,
+    (key) => {
+      let key$1 = identity(key);
+      let $ = run(key$1, decoder);
+      if ($ instanceof Ok) {
+        let key$2 = $[0];
+        return key$2;
+      } else {
+        return "<" + classify_dynamic(key$1) + ">";
+      }
+    }
+  );
+  let errors = map(
+    layer[1],
+    (error) => {
+      return new DecodeError(
+        error.expected,
+        error.found,
+        append2(path$1, error.path)
+      );
+    }
+  );
+  return [layer[0], errors];
+}
+function index3(loop$path, loop$position, loop$inner, loop$data, loop$handle_miss) {
+  while (true) {
+    let path = loop$path;
+    let position = loop$position;
+    let inner = loop$inner;
+    let data = loop$data;
+    let handle_miss = loop$handle_miss;
+    if (path instanceof Empty) {
+      let _pipe = inner(data);
+      return push_path(_pipe, reverse(position));
+    } else {
+      let key = path.head;
+      let path$1 = path.tail;
+      let $ = index2(data, key);
+      if ($ instanceof Ok) {
+        let $1 = $[0];
+        if ($1 instanceof Some) {
+          let data$1 = $1[0];
+          loop$path = path$1;
+          loop$position = prepend(key, position);
+          loop$inner = inner;
+          loop$data = data$1;
+          loop$handle_miss = handle_miss;
+        } else {
+          return handle_miss(data, prepend(key, position));
+        }
+      } else {
+        let kind = $[0];
+        let $1 = inner(data);
+        let default$;
+        default$ = $1[0];
+        let _pipe = [
+          default$,
+          toList([new DecodeError(kind, classify_dynamic(data), toList([]))])
+        ];
+        return push_path(_pipe, reverse(position));
+      }
+    }
+  }
+}
+function subfield(field_path, field_decoder, next) {
+  return new Decoder(
+    (data) => {
+      let $ = index3(
+        field_path,
+        toList([]),
+        field_decoder.function,
+        data,
+        (data2, position) => {
+          let $12 = field_decoder.function(data2);
+          let default$;
+          default$ = $12[0];
+          let _pipe = [
+            default$,
+            toList([new DecodeError("Field", "Nothing", toList([]))])
+          ];
+          return push_path(_pipe, reverse(position));
+        }
+      );
+      let out;
+      let errors1;
+      out = $[0];
+      errors1 = $[1];
+      let $1 = next(out).function(data);
+      let out$1;
+      let errors2;
+      out$1 = $1[0];
+      errors2 = $1[1];
+      return [out$1, append2(errors1, errors2)];
+    }
+  );
+}
+
+// build/dev/javascript/gleam_stdlib/gleam_stdlib.mjs
+function identity(x) {
+  return x;
+}
+function to_string(term) {
+  return term.toString();
+}
+function string_length(string5) {
+  if (string5 === "") {
+    return 0;
+  }
+  const iterator = graphemes_iterator(string5);
+  if (iterator) {
+    let i = 0;
+    for (const _ of iterator) {
+      i++;
+    }
+    return i;
+  } else {
+    return string5.match(/./gsu).length;
+  }
+}
+var segmenter = void 0;
+function graphemes_iterator(string5) {
+  if (globalThis.Intl && Intl.Segmenter) {
+    segmenter ||= new Intl.Segmenter();
+    return segmenter.segment(string5)[Symbol.iterator]();
+  }
+}
+function starts_with(haystack, needle) {
+  return haystack.startsWith(needle);
+}
+var unicode_whitespaces = [
+  " ",
+  // Space
+  "	",
+  // Horizontal tab
+  "\n",
+  // Line feed
+  "\v",
+  // Vertical tab
+  "\f",
+  // Form feed
+  "\r",
+  // Carriage return
+  "\x85",
+  // Next line
+  "\u2028",
+  // Line separator
+  "\u2029"
+  // Paragraph separator
+].join("");
+var trim_start_regex = /* @__PURE__ */ new RegExp(
+  `^[${unicode_whitespaces}]*`
+);
+var trim_end_regex = /* @__PURE__ */ new RegExp(`[${unicode_whitespaces}]*$`);
+function classify_dynamic(data) {
+  if (typeof data === "string") {
+    return "String";
+  } else if (typeof data === "boolean") {
+    return "Bool";
+  } else if (data instanceof Result) {
+    return "Result";
+  } else if (data instanceof List) {
+    return "List";
+  } else if (data instanceof BitArray) {
+    return "BitArray";
+  } else if (data instanceof Dict) {
+    return "Dict";
+  } else if (Number.isInteger(data)) {
+    return "Int";
+  } else if (Array.isArray(data)) {
+    return `Array`;
+  } else if (typeof data === "number") {
+    return "Float";
+  } else if (data === null) {
+    return "Nil";
+  } else if (data === void 0) {
+    return "Nil";
+  } else {
+    const type = typeof data;
+    return type.charAt(0).toUpperCase() + type.slice(1);
+  }
+}
+function index2(data, key) {
+  if (data instanceof Dict || data instanceof WeakMap || data instanceof Map) {
+    const token = {};
+    const entry = data.get(key, token);
+    if (entry === token) return new Ok(new None());
+    return new Ok(new Some(entry));
+  }
+  const key_is_int = Number.isInteger(key);
+  if (key_is_int && key >= 0 && key < 8 && data instanceof List) {
+    let i = 0;
+    for (const value2 of data) {
+      if (i === key) return new Ok(new Some(value2));
+      i++;
+    }
+    return new Error("Indexable");
+  }
+  if (key_is_int && Array.isArray(data) || data && typeof data === "object" || data && Object.getPrototypeOf(data) === Object.prototype) {
+    if (key in data) return new Ok(new Some(data[key]));
+    return new Ok(new None());
+  }
+  return new Error(key_is_int ? "Indexable" : "Dict");
+}
+function int(data) {
+  if (Number.isInteger(data)) return new Ok(data);
+  return new Error(0);
+}
+function string(data) {
+  if (typeof data === "string") return new Ok(data);
+  return new Error("");
+}
 
 // build/dev/javascript/gleam_stdlib/gleam/list.mjs
 var Ascending = class extends CustomType {
@@ -1418,27 +1474,10 @@ function append_loop(loop$first, loop$second) {
     }
   }
 }
-function append(first, second) {
+function append2(first, second) {
   return append_loop(reverse(first), second);
 }
-function flatten_loop(loop$lists, loop$acc) {
-  while (true) {
-    let lists = loop$lists;
-    let acc = loop$acc;
-    if (lists instanceof Empty) {
-      return reverse(acc);
-    } else {
-      let list4 = lists.head;
-      let further_lists = lists.tail;
-      loop$lists = further_lists;
-      loop$acc = reverse_and_prepend(list4, acc);
-    }
-  }
-}
-function flatten(lists) {
-  return flatten_loop(lists, toList([]));
-}
-function fold(loop$list, loop$initial, loop$fun) {
+function fold2(loop$list, loop$initial, loop$fun) {
   while (true) {
     let list4 = loop$list;
     let initial = loop$initial;
@@ -1728,7 +1767,7 @@ function merge_all(loop$sequences, loop$direction, loop$compare) {
     let direction = loop$direction;
     let compare4 = loop$compare;
     if (sequences2 instanceof Empty) {
-      return toList([]);
+      return sequences2;
     } else if (direction instanceof Ascending) {
       let $ = sequences2.tail;
       if ($ instanceof Empty) {
@@ -1756,12 +1795,11 @@ function merge_all(loop$sequences, loop$direction, loop$compare) {
 }
 function sort(list4, compare4) {
   if (list4 instanceof Empty) {
-    return toList([]);
+    return list4;
   } else {
     let $ = list4.tail;
     if ($ instanceof Empty) {
-      let x = list4.head;
-      return toList([x]);
+      return list4;
     } else {
       let x = list4.head;
       let y = $.head;
@@ -1807,443 +1845,6 @@ function concat_loop(loop$strings, loop$accumulator) {
 function concat2(strings) {
   return concat_loop(strings, "");
 }
-function join_loop(loop$strings, loop$separator, loop$accumulator) {
-  while (true) {
-    let strings = loop$strings;
-    let separator = loop$separator;
-    let accumulator = loop$accumulator;
-    if (strings instanceof Empty) {
-      return accumulator;
-    } else {
-      let string5 = strings.head;
-      let strings$1 = strings.tail;
-      loop$strings = strings$1;
-      loop$separator = separator;
-      loop$accumulator = accumulator + separator + string5;
-    }
-  }
-}
-function join(strings, separator) {
-  if (strings instanceof Empty) {
-    return "";
-  } else {
-    let first$1 = strings.head;
-    let rest = strings.tail;
-    return join_loop(rest, separator, first$1);
-  }
-}
-function split2(x, substring) {
-  if (substring === "") {
-    return graphemes(x);
-  } else {
-    let _pipe = x;
-    let _pipe$1 = identity(_pipe);
-    let _pipe$2 = split(_pipe$1, substring);
-    return map(_pipe$2, identity);
-  }
-}
-
-// build/dev/javascript/gleam_stdlib/gleam/dynamic/decode.mjs
-var DecodeError = class extends CustomType {
-  constructor(expected, found, path) {
-    super();
-    this.expected = expected;
-    this.found = found;
-    this.path = path;
-  }
-};
-var Decoder = class extends CustomType {
-  constructor(function$) {
-    super();
-    this.function = function$;
-  }
-};
-function run(data, decoder) {
-  let $ = decoder.function(data);
-  let maybe_invalid_data = $[0];
-  let errors = $[1];
-  if (errors instanceof Empty) {
-    return new Ok(maybe_invalid_data);
-  } else {
-    return new Error(errors);
-  }
-}
-function success(data) {
-  return new Decoder((_) => {
-    return [data, toList([])];
-  });
-}
-function map2(decoder, transformer) {
-  return new Decoder(
-    (d) => {
-      let $ = decoder.function(d);
-      let data = $[0];
-      let errors = $[1];
-      return [transformer(data), errors];
-    }
-  );
-}
-function run_decoders(loop$data, loop$failure, loop$decoders) {
-  while (true) {
-    let data = loop$data;
-    let failure2 = loop$failure;
-    let decoders = loop$decoders;
-    if (decoders instanceof Empty) {
-      return failure2;
-    } else {
-      let decoder = decoders.head;
-      let decoders$1 = decoders.tail;
-      let $ = decoder.function(data);
-      let layer = $;
-      let errors = $[1];
-      if (errors instanceof Empty) {
-        return layer;
-      } else {
-        loop$data = data;
-        loop$failure = failure2;
-        loop$decoders = decoders$1;
-      }
-    }
-  }
-}
-function one_of(first, alternatives) {
-  return new Decoder(
-    (dynamic_data) => {
-      let $ = first.function(dynamic_data);
-      let layer = $;
-      let errors = $[1];
-      if (errors instanceof Empty) {
-        return layer;
-      } else {
-        return run_decoders(dynamic_data, layer, alternatives);
-      }
-    }
-  );
-}
-function run_dynamic_function(data, name, f) {
-  let $ = f(data);
-  if ($ instanceof Ok) {
-    let data$1 = $[0];
-    return [data$1, toList([])];
-  } else {
-    let zero = $[0];
-    return [
-      zero,
-      toList([new DecodeError(name, classify_dynamic(data), toList([]))])
-    ];
-  }
-}
-function decode_int(data) {
-  return run_dynamic_function(data, "Int", int);
-}
-var int2 = /* @__PURE__ */ new Decoder(decode_int);
-function decode_string(data) {
-  return run_dynamic_function(data, "String", string);
-}
-var string2 = /* @__PURE__ */ new Decoder(decode_string);
-function push_path(layer, path) {
-  let decoder = one_of(
-    string2,
-    toList([
-      (() => {
-        let _pipe = int2;
-        return map2(_pipe, to_string);
-      })()
-    ])
-  );
-  let path$1 = map(
-    path,
-    (key) => {
-      let key$1 = identity(key);
-      let $ = run(key$1, decoder);
-      if ($ instanceof Ok) {
-        let key$2 = $[0];
-        return key$2;
-      } else {
-        return "<" + classify_dynamic(key$1) + ">";
-      }
-    }
-  );
-  let errors = map(
-    layer[1],
-    (error) => {
-      let _record = error;
-      return new DecodeError(
-        _record.expected,
-        _record.found,
-        append(path$1, error.path)
-      );
-    }
-  );
-  return [layer[0], errors];
-}
-function index3(loop$path, loop$position, loop$inner, loop$data, loop$handle_miss) {
-  while (true) {
-    let path = loop$path;
-    let position = loop$position;
-    let inner = loop$inner;
-    let data = loop$data;
-    let handle_miss = loop$handle_miss;
-    if (path instanceof Empty) {
-      let _pipe = inner(data);
-      return push_path(_pipe, reverse(position));
-    } else {
-      let key = path.head;
-      let path$1 = path.tail;
-      let $ = index2(data, key);
-      if ($ instanceof Ok) {
-        let $1 = $[0];
-        if ($1 instanceof Some) {
-          let data$1 = $1[0];
-          loop$path = path$1;
-          loop$position = prepend(key, position);
-          loop$inner = inner;
-          loop$data = data$1;
-          loop$handle_miss = handle_miss;
-        } else {
-          return handle_miss(data, prepend(key, position));
-        }
-      } else {
-        let kind = $[0];
-        let $1 = inner(data);
-        let default$ = $1[0];
-        let _pipe = [
-          default$,
-          toList([new DecodeError(kind, classify_dynamic(data), toList([]))])
-        ];
-        return push_path(_pipe, reverse(position));
-      }
-    }
-  }
-}
-function subfield(field_path, field_decoder, next) {
-  return new Decoder(
-    (data) => {
-      let $ = index3(
-        field_path,
-        toList([]),
-        field_decoder.function,
-        data,
-        (data2, position) => {
-          let $12 = field_decoder.function(data2);
-          let default$ = $12[0];
-          let _pipe = [
-            default$,
-            toList([new DecodeError("Field", "Nothing", toList([]))])
-          ];
-          return push_path(_pipe, reverse(position));
-        }
-      );
-      let out = $[0];
-      let errors1 = $[1];
-      let $1 = next(out).function(data);
-      let out$1 = $1[0];
-      let errors2 = $1[1];
-      return [out$1, append(errors1, errors2)];
-    }
-  );
-}
-
-// build/dev/javascript/gleam_stdlib/gleam_stdlib.mjs
-var Nil = void 0;
-var NOT_FOUND = {};
-function identity(x) {
-  return x;
-}
-function to_string(term) {
-  return term.toString();
-}
-function string_length(string5) {
-  if (string5 === "") {
-    return 0;
-  }
-  const iterator = graphemes_iterator(string5);
-  if (iterator) {
-    let i = 0;
-    for (const _ of iterator) {
-      i++;
-    }
-    return i;
-  } else {
-    return string5.match(/./gsu).length;
-  }
-}
-function graphemes(string5) {
-  const iterator = graphemes_iterator(string5);
-  if (iterator) {
-    return List.fromArray(Array.from(iterator).map((item) => item.segment));
-  } else {
-    return List.fromArray(string5.match(/./gsu));
-  }
-}
-var segmenter = void 0;
-function graphemes_iterator(string5) {
-  if (globalThis.Intl && Intl.Segmenter) {
-    segmenter ||= new Intl.Segmenter();
-    return segmenter.segment(string5)[Symbol.iterator]();
-  }
-}
-function split(xs, pattern) {
-  return List.fromArray(xs.split(pattern));
-}
-function contains_string(haystack, needle) {
-  return haystack.indexOf(needle) >= 0;
-}
-function starts_with(haystack, needle) {
-  return haystack.startsWith(needle);
-}
-var unicode_whitespaces = [
-  " ",
-  // Space
-  "	",
-  // Horizontal tab
-  "\n",
-  // Line feed
-  "\v",
-  // Vertical tab
-  "\f",
-  // Form feed
-  "\r",
-  // Carriage return
-  "\x85",
-  // Next line
-  "\u2028",
-  // Line separator
-  "\u2029"
-  // Paragraph separator
-].join("");
-var trim_start_regex = /* @__PURE__ */ new RegExp(
-  `^[${unicode_whitespaces}]*`
-);
-var trim_end_regex = /* @__PURE__ */ new RegExp(`[${unicode_whitespaces}]*$`);
-function new_map() {
-  return Dict.new();
-}
-function map_to_list(map4) {
-  return List.fromArray(map4.entries());
-}
-function map_get(map4, key) {
-  const value2 = map4.get(key, NOT_FOUND);
-  if (value2 === NOT_FOUND) {
-    return new Error(Nil);
-  }
-  return new Ok(value2);
-}
-function map_insert(key, value2, map4) {
-  return map4.set(key, value2);
-}
-function classify_dynamic(data) {
-  if (typeof data === "string") {
-    return "String";
-  } else if (typeof data === "boolean") {
-    return "Bool";
-  } else if (data instanceof Result) {
-    return "Result";
-  } else if (data instanceof List) {
-    return "List";
-  } else if (data instanceof BitArray) {
-    return "BitArray";
-  } else if (data instanceof Dict) {
-    return "Dict";
-  } else if (Number.isInteger(data)) {
-    return "Int";
-  } else if (Array.isArray(data)) {
-    return `Array`;
-  } else if (typeof data === "number") {
-    return "Float";
-  } else if (data === null) {
-    return "Nil";
-  } else if (data === void 0) {
-    return "Nil";
-  } else {
-    const type = typeof data;
-    return type.charAt(0).toUpperCase() + type.slice(1);
-  }
-}
-function index2(data, key) {
-  if (data instanceof Dict || data instanceof WeakMap || data instanceof Map) {
-    const token2 = {};
-    const entry = data.get(key, token2);
-    if (entry === token2) return new Ok(new None());
-    return new Ok(new Some(entry));
-  }
-  const key_is_int = Number.isInteger(key);
-  if (key_is_int && key >= 0 && key < 8 && data instanceof List) {
-    let i = 0;
-    for (const value2 of data) {
-      if (i === key) return new Ok(new Some(value2));
-      i++;
-    }
-    return new Error("Indexable");
-  }
-  if (key_is_int && Array.isArray(data) || data && typeof data === "object" || data && Object.getPrototypeOf(data) === Object.prototype) {
-    if (key in data) return new Ok(new Some(data[key]));
-    return new Ok(new None());
-  }
-  return new Error(key_is_int ? "Indexable" : "Dict");
-}
-function int(data) {
-  if (Number.isInteger(data)) return new Ok(data);
-  return new Error(0);
-}
-function string(data) {
-  if (typeof data === "string") return new Ok(data);
-  return new Error("");
-}
-
-// build/dev/javascript/gleam_stdlib/gleam/dict.mjs
-function insert(dict2, key, value2) {
-  return map_insert(key, value2, dict2);
-}
-function from_list_loop(loop$list, loop$initial) {
-  while (true) {
-    let list4 = loop$list;
-    let initial = loop$initial;
-    if (list4 instanceof Empty) {
-      return initial;
-    } else {
-      let rest = list4.tail;
-      let key = list4.head[0];
-      let value2 = list4.head[1];
-      loop$list = rest;
-      loop$initial = insert(initial, key, value2);
-    }
-  }
-}
-function from_list(list4) {
-  return from_list_loop(list4, new_map());
-}
-function insert_pair(dict2, pair) {
-  return insert(dict2, pair[0], pair[1]);
-}
-function fold_inserts(loop$new_entries, loop$dict) {
-  while (true) {
-    let new_entries = loop$new_entries;
-    let dict2 = loop$dict;
-    if (new_entries instanceof Empty) {
-      return dict2;
-    } else {
-      let first = new_entries.head;
-      let rest = new_entries.tail;
-      loop$new_entries = rest;
-      loop$dict = insert_pair(dict2, first);
-    }
-  }
-}
-function merge(dict2, new_entries) {
-  let _pipe = new_entries;
-  let _pipe$1 = map_to_list(_pipe);
-  return fold_inserts(_pipe$1, dict2);
-}
-
-// build/dev/javascript/gleam_stdlib/gleam/result.mjs
-function is_ok(result) {
-  if (result instanceof Ok) {
-    return true;
-  } else {
-    return false;
-  }
-}
 
 // build/dev/javascript/gleam_stdlib/gleam/bool.mjs
 function guard(requirement, consequence, alternative) {
@@ -2259,36 +1860,11 @@ function identity2(x) {
   return x;
 }
 
-// build/dev/javascript/gleam_stdlib/gleam/set.mjs
-var Set2 = class extends CustomType {
-  constructor(dict2) {
-    super();
-    this.dict = dict2;
-  }
-};
-function new$() {
-  return new Set2(new_map());
-}
-function contains(set, member) {
-  let _pipe = set.dict;
-  let _pipe$1 = map_get(_pipe, member);
-  return is_ok(_pipe$1);
-}
-var token = void 0;
-function insert2(set, member) {
-  return new Set2(insert(set.dict, member, token));
-}
-
 // build/dev/javascript/lustre/lustre/internals/constants.ffi.mjs
-var EMPTY_DICT = /* @__PURE__ */ Dict.new();
-var EMPTY_SET = /* @__PURE__ */ new$();
-var empty_dict = () => EMPTY_DICT;
-var empty_set = () => EMPTY_SET;
 var document = () => globalThis?.document;
 var NAMESPACE_HTML = "http://www.w3.org/1999/xhtml";
 var ELEMENT_NODE = 1;
 var TEXT_NODE = 3;
-var DOCUMENT_FRAGMENT_NODE = 11;
 var SUPPORTS_MOVE_BEFORE = !!globalThis.HTMLElement?.prototype?.moveBefore;
 
 // build/dev/javascript/lustre/lustre/internals/constants.mjs
@@ -2354,7 +1930,7 @@ var Never = class extends CustomType {
     this.kind = kind;
   }
 };
-function merge2(loop$attributes, loop$merged) {
+function merge(loop$attributes, loop$merged) {
   while (true) {
     let attributes = loop$attributes;
     let merged = loop$merged;
@@ -2475,7 +2051,7 @@ function prepare(attributes) {
       let _pipe$1 = sort(_pipe, (a, b) => {
         return compare3(b, a);
       });
-      return merge2(_pipe$1, empty_list);
+      return merge(_pipe$1, empty_list);
     }
   }
 }
@@ -2543,7 +2119,10 @@ function get(map4, key) {
     return new Error(void 0);
   }
 }
-function insert3(map4, key, value2) {
+function has_key2(map4, key) {
+  return map4 && map4.has(key);
+}
+function insert2(map4, key, value2) {
   map4 ??= /* @__PURE__ */ new Map();
   map4.set(key, value2);
   return map4;
@@ -2581,7 +2160,7 @@ function do_matches(loop$path, loop$candidates) {
       let rest = candidates.tail;
       let $ = starts_with(path, candidate);
       if ($) {
-        return true;
+        return $;
       } else {
         loop$path = path;
         loop$candidates = rest;
@@ -2642,14 +2221,13 @@ function event2(path, event4) {
 
 // build/dev/javascript/lustre/lustre/vdom/vnode.mjs
 var Fragment = class extends CustomType {
-  constructor(kind, key, mapper, children, keyed_children, children_count) {
+  constructor(kind, key, mapper, children, keyed_children) {
     super();
     this.kind = kind;
     this.key = key;
     this.mapper = mapper;
     this.children = children;
     this.keyed_children = keyed_children;
-    this.children_count = children_count;
   }
 };
 var Element = class extends CustomType {
@@ -2725,24 +2303,45 @@ function is_void_element(tag, namespace) {
     return false;
   }
 }
-function advance(node) {
+function to_keyed(key, node) {
   if (node instanceof Fragment) {
-    let children_count = node.children_count;
-    return 1 + children_count;
+    return new Fragment(
+      node.kind,
+      key,
+      node.mapper,
+      node.children,
+      node.keyed_children
+    );
+  } else if (node instanceof Element) {
+    return new Element(
+      node.kind,
+      key,
+      node.mapper,
+      node.namespace,
+      node.tag,
+      node.attributes,
+      node.children,
+      node.keyed_children,
+      node.self_closing,
+      node.void
+    );
+  } else if (node instanceof Text) {
+    return new Text(node.kind, key, node.mapper, node.content);
   } else {
-    return 1;
+    return new UnsafeInnerHtml(
+      node.kind,
+      key,
+      node.mapper,
+      node.namespace,
+      node.tag,
+      node.attributes,
+      node.inner_html
+    );
   }
 }
 var fragment_kind = 0;
-function fragment(key, mapper, children, keyed_children, children_count) {
-  return new Fragment(
-    fragment_kind,
-    key,
-    mapper,
-    children,
-    keyed_children,
-    children_count
-  );
+function fragment(key, mapper, children, keyed_children) {
+  return new Fragment(fragment_kind, key, mapper, children, keyed_children);
 }
 var element_kind = 1;
 function element(key, mapper, namespace, tag, attributes, children, keyed_children, self_closing, void$) {
@@ -2764,163 +2363,6 @@ function text(key, mapper, content) {
   return new Text(text_kind, key, mapper, content);
 }
 var unsafe_inner_html_kind = 3;
-function set_fragment_key(loop$key, loop$children, loop$index, loop$new_children, loop$keyed_children) {
-  while (true) {
-    let key = loop$key;
-    let children = loop$children;
-    let index4 = loop$index;
-    let new_children = loop$new_children;
-    let keyed_children = loop$keyed_children;
-    if (children instanceof Empty) {
-      return [reverse(new_children), keyed_children];
-    } else {
-      let $ = children.head;
-      if ($ instanceof Fragment) {
-        let node = $;
-        if (node.key === "") {
-          let children$1 = children.tail;
-          let child_key = key + "::" + to_string(index4);
-          let $1 = set_fragment_key(
-            child_key,
-            node.children,
-            0,
-            empty_list,
-            empty2()
-          );
-          let node_children = $1[0];
-          let node_keyed_children = $1[1];
-          let _block;
-          let _record = node;
-          _block = new Fragment(
-            _record.kind,
-            _record.key,
-            _record.mapper,
-            node_children,
-            node_keyed_children,
-            _record.children_count
-          );
-          let new_node = _block;
-          let new_children$1 = prepend(new_node, new_children);
-          let index$1 = index4 + 1;
-          loop$key = key;
-          loop$children = children$1;
-          loop$index = index$1;
-          loop$new_children = new_children$1;
-          loop$keyed_children = keyed_children;
-        } else {
-          let node$1 = $;
-          if (node$1.key !== "") {
-            let children$1 = children.tail;
-            let child_key = key + "::" + node$1.key;
-            let keyed_node = to_keyed(child_key, node$1);
-            let new_children$1 = prepend(keyed_node, new_children);
-            let keyed_children$1 = insert3(
-              keyed_children,
-              child_key,
-              keyed_node
-            );
-            let index$1 = index4 + 1;
-            loop$key = key;
-            loop$children = children$1;
-            loop$index = index$1;
-            loop$new_children = new_children$1;
-            loop$keyed_children = keyed_children$1;
-          } else {
-            let node$2 = $;
-            let children$1 = children.tail;
-            let new_children$1 = prepend(node$2, new_children);
-            let index$1 = index4 + 1;
-            loop$key = key;
-            loop$children = children$1;
-            loop$index = index$1;
-            loop$new_children = new_children$1;
-            loop$keyed_children = keyed_children;
-          }
-        }
-      } else {
-        let node = $;
-        if (node.key !== "") {
-          let children$1 = children.tail;
-          let child_key = key + "::" + node.key;
-          let keyed_node = to_keyed(child_key, node);
-          let new_children$1 = prepend(keyed_node, new_children);
-          let keyed_children$1 = insert3(
-            keyed_children,
-            child_key,
-            keyed_node
-          );
-          let index$1 = index4 + 1;
-          loop$key = key;
-          loop$children = children$1;
-          loop$index = index$1;
-          loop$new_children = new_children$1;
-          loop$keyed_children = keyed_children$1;
-        } else {
-          let node$1 = $;
-          let children$1 = children.tail;
-          let new_children$1 = prepend(node$1, new_children);
-          let index$1 = index4 + 1;
-          loop$key = key;
-          loop$children = children$1;
-          loop$index = index$1;
-          loop$new_children = new_children$1;
-          loop$keyed_children = keyed_children;
-        }
-      }
-    }
-  }
-}
-function to_keyed(key, node) {
-  if (node instanceof Fragment) {
-    let children = node.children;
-    let $ = set_fragment_key(
-      key,
-      children,
-      0,
-      empty_list,
-      empty2()
-    );
-    let children$1 = $[0];
-    let keyed_children = $[1];
-    let _record = node;
-    return new Fragment(
-      _record.kind,
-      key,
-      _record.mapper,
-      children$1,
-      keyed_children,
-      _record.children_count
-    );
-  } else if (node instanceof Element) {
-    let _record = node;
-    return new Element(
-      _record.kind,
-      key,
-      _record.mapper,
-      _record.namespace,
-      _record.tag,
-      _record.attributes,
-      _record.children,
-      _record.keyed_children,
-      _record.self_closing,
-      _record.void
-    );
-  } else if (node instanceof Text) {
-    let _record = node;
-    return new Text(_record.kind, key, _record.mapper, _record.content);
-  } else {
-    let _record = node;
-    return new UnsafeInnerHtml(
-      _record.kind,
-      key,
-      _record.mapper,
-      _record.namespace,
-      _record.tag,
-      _record.attributes,
-      _record.inner_html
-    );
-  }
-}
 
 // build/dev/javascript/lustre/lustre/internals/equals.ffi.mjs
 var isReferenceEqual = (a, b) => a === b;
@@ -3005,15 +2447,14 @@ function do_remove_event(handlers, path, name) {
 }
 function remove_event(events, path, name) {
   let handlers = do_remove_event(events.handlers, path, name);
-  let _record = events;
   return new Events(
     handlers,
-    _record.dispatched_paths,
-    _record.next_dispatched_paths
+    events.dispatched_paths,
+    events.next_dispatched_paths
   );
 }
 function remove_attributes(handlers, path, attributes) {
-  return fold(
+  return fold2(
     attributes,
     handlers,
     (events, attribute3) => {
@@ -3028,14 +2469,11 @@ function remove_attributes(handlers, path, attributes) {
 }
 function handle(events, path, name, event4) {
   let next_dispatched_paths = prepend(path, events.next_dispatched_paths);
-  let _block;
-  let _record = events;
-  _block = new Events(
-    _record.handlers,
-    _record.dispatched_paths,
+  let events$1 = new Events(
+    events.handlers,
+    events.dispatched_paths,
     next_dispatched_paths
   );
-  let events$1 = _block;
   let $ = get(
     events$1.handlers,
     path + separator_event + name
@@ -3051,16 +2489,15 @@ function has_dispatched_events(events, path) {
   return matches(path, events.dispatched_paths);
 }
 function do_add_event(handlers, mapper, path, name, handler) {
-  return insert3(
+  return insert2(
     handlers,
     event2(path, name),
     map2(
       handler,
       (handler2) => {
-        let _record = handler2;
         return new Handler(
-          _record.prevent_default,
-          _record.stop_propagation,
+          handler2.prevent_default,
+          handler2.stop_propagation,
           identity2(mapper)(handler2.message)
         );
       }
@@ -3069,15 +2506,14 @@ function do_add_event(handlers, mapper, path, name, handler) {
 }
 function add_event(events, mapper, path, name, handler) {
   let handlers = do_add_event(events.handlers, mapper, path, name, handler);
-  let _record = events;
   return new Events(
     handlers,
-    _record.dispatched_paths,
-    _record.next_dispatched_paths
+    events.dispatched_paths,
+    events.next_dispatched_paths
   );
 }
 function add_attributes(handlers, mapper, path, attributes) {
-  return fold(
+  return fold2(
     attributes,
     handlers,
     (events, attribute3) => {
@@ -3119,7 +2555,7 @@ function do_remove_children(loop$handlers, loop$path, loop$child_index, loop$chi
       let _pipe$1 = do_remove_child(_pipe, path, child_index, child);
       loop$handlers = _pipe$1;
       loop$path = path;
-      loop$child_index = child_index + advance(child);
+      loop$child_index = child_index + 1;
       loop$children = rest;
     }
   }
@@ -3127,7 +2563,8 @@ function do_remove_children(loop$handlers, loop$path, loop$child_index, loop$chi
 function do_remove_child(handlers, parent, child_index, child) {
   if (child instanceof Fragment) {
     let children = child.children;
-    return do_remove_children(handlers, parent, child_index + 1, children);
+    let path = add2(parent, child_index, child.key);
+    return do_remove_children(handlers, path, 0, children);
   } else if (child instanceof Element) {
     let attributes = child.attributes;
     let children = child.children;
@@ -3145,11 +2582,10 @@ function do_remove_child(handlers, parent, child_index, child) {
 }
 function remove_child(events, parent, child_index, child) {
   let handlers = do_remove_child(events.handlers, parent, child_index, child);
-  let _record = events;
   return new Events(
     handlers,
-    _record.dispatched_paths,
-    _record.next_dispatched_paths
+    events.dispatched_paths,
+    events.next_dispatched_paths
   );
 }
 function do_add_children(loop$handlers, loop$mapper, loop$path, loop$child_index, loop$children) {
@@ -3169,7 +2605,7 @@ function do_add_children(loop$handlers, loop$mapper, loop$path, loop$child_index
       loop$handlers = _pipe$1;
       loop$mapper = mapper;
       loop$path = path;
-      loop$child_index = child_index + advance(child);
+      loop$child_index = child_index + 1;
       loop$children = rest;
     }
   }
@@ -3177,15 +2613,9 @@ function do_add_children(loop$handlers, loop$mapper, loop$path, loop$child_index
 function do_add_child(handlers, mapper, parent, child_index, child) {
   if (child instanceof Fragment) {
     let children = child.children;
+    let path = add2(parent, child_index, child.key);
     let composed_mapper = compose_mapper(mapper, child.mapper);
-    let child_index$1 = child_index + 1;
-    return do_add_children(
-      handlers,
-      composed_mapper,
-      parent,
-      child_index$1,
-      children
-    );
+    return do_add_children(handlers, composed_mapper, path, 0, children);
   } else if (child instanceof Element) {
     let attributes = child.attributes;
     let children = child.children;
@@ -3205,11 +2635,10 @@ function do_add_child(handlers, mapper, parent, child_index, child) {
 }
 function add_child(events, mapper, parent, index4, child) {
   let handlers = do_add_child(events.handlers, mapper, parent, index4, child);
-  let _record = events;
   return new Events(
     handlers,
-    _record.dispatched_paths,
-    _record.next_dispatched_paths
+    events.dispatched_paths,
+    events.next_dispatched_paths
   );
 }
 function add_children(events, mapper, path, child_index, children) {
@@ -3220,11 +2649,10 @@ function add_children(events, mapper, path, child_index, children) {
     child_index,
     children
   );
-  let _record = events;
   return new Events(
     handlers,
-    _record.dispatched_paths,
-    _record.next_dispatched_paths
+    events.dispatched_paths,
+    events.next_dispatched_paths
   );
 }
 
@@ -3242,47 +2670,11 @@ function element2(tag, attributes, children) {
     false
   );
 }
-function namespaced(namespace, tag, attributes, children) {
-  return element(
-    "",
-    identity2,
-    namespace,
-    tag,
-    attributes,
-    children,
-    empty2(),
-    false,
-    false
-  );
-}
 function text2(content) {
   return text("", identity2, content);
 }
 function none2() {
   return text("", identity2, "");
-}
-function count_fragment_children(loop$children, loop$count) {
-  while (true) {
-    let children = loop$children;
-    let count = loop$count;
-    if (children instanceof Empty) {
-      return count;
-    } else {
-      let child = children.head;
-      let rest = children.tail;
-      loop$children = rest;
-      loop$count = count + advance(child);
-    }
-  }
-}
-function fragment2(children) {
-  return fragment(
-    "",
-    identity2,
-    children,
-    empty2(),
-    count_fragment_children(children, 0)
-  );
 }
 
 // build/dev/javascript/lustre/lustre/element/html.mjs
@@ -3338,29 +2730,26 @@ var Update = class extends CustomType {
   }
 };
 var Move = class extends CustomType {
-  constructor(kind, key, before, count) {
+  constructor(kind, key, before) {
     super();
     this.kind = kind;
     this.key = key;
     this.before = before;
-    this.count = count;
-  }
-};
-var RemoveKey = class extends CustomType {
-  constructor(kind, key, count) {
-    super();
-    this.kind = kind;
-    this.key = key;
-    this.count = count;
   }
 };
 var Replace = class extends CustomType {
-  constructor(kind, from, count, with$) {
+  constructor(kind, index4, with$) {
     super();
     this.kind = kind;
-    this.from = from;
-    this.count = count;
+    this.index = index4;
     this.with = with$;
+  }
+};
+var Remove = class extends CustomType {
+  constructor(kind, index4) {
+    super();
+    this.kind = kind;
+    this.index = index4;
   }
 };
 var Insert = class extends CustomType {
@@ -3369,14 +2758,6 @@ var Insert = class extends CustomType {
     this.kind = kind;
     this.children = children;
     this.before = before;
-  }
-};
-var Remove = class extends CustomType {
-  constructor(kind, from, count) {
-    super();
-    this.kind = kind;
-    this.from = from;
-    this.count = count;
   }
 };
 function new$5(index4, removed, changes, children) {
@@ -3395,24 +2776,20 @@ function update(added, removed) {
   return new Update(update_kind, added, removed);
 }
 var move_kind = 3;
-function move(key, before, count) {
-  return new Move(move_kind, key, before, count);
+function move(key, before) {
+  return new Move(move_kind, key, before);
 }
-var remove_key_kind = 4;
-function remove_key(key, count) {
-  return new RemoveKey(remove_key_kind, key, count);
+var remove_kind = 4;
+function remove2(index4) {
+  return new Remove(remove_kind, index4);
 }
 var replace_kind = 5;
-function replace2(from, count, with$) {
-  return new Replace(replace_kind, from, count, with$);
+function replace2(index4, with$) {
+  return new Replace(replace_kind, index4, with$);
 }
 var insert_kind = 6;
-function insert4(children, before) {
+function insert3(children, before) {
   return new Insert(insert_kind, children, before);
-}
-var remove_kind = 7;
-function remove2(from, count) {
-  return new Remove(remove_kind, from, count);
 }
 
 // build/dev/javascript/lustre/lustre/vdom/diff.mjs
@@ -3432,24 +2809,12 @@ var AttributeChange = class extends CustomType {
   }
 };
 function is_controlled(events, namespace, tag, path) {
-  if (tag === "input") {
-    if (namespace === "") {
-      return has_dispatched_events(events, path);
-    } else {
-      return false;
-    }
-  } else if (tag === "select") {
-    if (namespace === "") {
-      return has_dispatched_events(events, path);
-    } else {
-      return false;
-    }
-  } else if (tag === "textarea") {
-    if (namespace === "") {
-      return has_dispatched_events(events, path);
-    } else {
-      return false;
-    }
+  if (tag === "input" && namespace === "") {
+    return has_dispatched_events(events, path);
+  } else if (tag === "select" && namespace === "") {
+    return has_dispatched_events(events, path);
+  } else if (tag === "textarea" && namespace === "") {
+    return has_dispatched_events(events, path);
   } else {
     return false;
   }
@@ -3682,10 +3047,7 @@ function diff_attributes(loop$controlled, loop$path, loop$mapper, loop$events, l
         } else if (prev instanceof Event2) {
           let name = next.name;
           let handler = next.handler;
-          let has_changes = !isEqual(
-            prev.prevent_default,
-            next.prevent_default
-          ) || !isEqual(prev.stop_propagation, next.stop_propagation) || prev.immediate !== next.immediate || prev.debounce !== next.debounce || prev.throttle !== next.throttle;
+          let has_changes = prev.prevent_default.kind !== next.prevent_default.kind || prev.stop_propagation.kind !== next.stop_propagation.kind || prev.immediate !== next.immediate || prev.debounce !== next.debounce || prev.throttle !== next.throttle;
           let _block;
           if (has_changes) {
             _block = prepend(next, added);
@@ -3770,9 +3132,9 @@ function do_diff(loop$old, loop$old_keyed, loop$new, loop$new_keyed, loop$moved,
         let prev = old.head;
         let old$1 = old.tail;
         let _block;
-        let $ = prev.key === "" || !contains(moved, prev.key);
+        let $ = prev.key === "" || !has_key2(moved, prev.key);
         if ($) {
-          _block = removed + advance(prev);
+          _block = removed + 1;
         } else {
           _block = removed;
         }
@@ -3801,8 +3163,8 @@ function do_diff(loop$old, loop$old_keyed, loop$new, loop$new_keyed, loop$moved,
         node_index,
         new$8
       );
-      let insert5 = insert4(new$8, node_index - moved_offset);
-      let changes$1 = prepend(insert5, changes);
+      let insert4 = insert3(new$8, node_index - moved_offset);
+      let changes$1 = prepend(insert4, changes);
       return new Diff(
         new Patch(patch_index, removed, changes$1, children),
         events$1
@@ -3814,17 +3176,18 @@ function do_diff(loop$old, loop$old_keyed, loop$new, loop$new_keyed, loop$moved,
         let new_remaining = new$8.tail;
         let old_remaining = old.tail;
         let next_did_exist = get(old_keyed, next.key);
-        let prev_does_exist = get(new_keyed, prev.key);
-        let prev_has_moved = contains(moved, prev.key);
+        let prev_does_exist = has_key2(new_keyed, prev.key);
         if (next_did_exist instanceof Ok) {
-          if (prev_does_exist instanceof Ok) {
-            if (prev_has_moved) {
+          if (prev_does_exist) {
+            let match = next_did_exist[0];
+            let $ = has_key2(moved, prev.key);
+            if ($) {
               loop$old = old_remaining;
               loop$old_keyed = old_keyed;
               loop$new = new$8;
               loop$new_keyed = new_keyed;
               loop$moved = moved;
-              loop$moved_offset = moved_offset - advance(prev);
+              loop$moved_offset = moved_offset - 1;
               loop$removed = removed;
               loop$node_index = node_index;
               loop$patch_index = patch_index;
@@ -3834,13 +3197,13 @@ function do_diff(loop$old, loop$old_keyed, loop$new, loop$new_keyed, loop$moved,
               loop$mapper = mapper;
               loop$events = events;
             } else {
-              let match = next_did_exist[0];
-              let count = advance(next);
               let before = node_index - moved_offset;
-              let move2 = move(next.key, before, count);
-              let changes$1 = prepend(move2, changes);
-              let moved$1 = insert2(moved, next.key);
-              let moved_offset$1 = moved_offset + count;
+              let changes$1 = prepend(
+                move(next.key, before),
+                changes
+              );
+              let moved$1 = insert2(moved, next.key, void 0);
+              let moved_offset$1 = moved_offset + 1;
               loop$old = prepend(match, old);
               loop$old_keyed = old_keyed;
               loop$new = new$8;
@@ -3857,11 +3220,10 @@ function do_diff(loop$old, loop$old_keyed, loop$new, loop$new_keyed, loop$moved,
               loop$events = events;
             }
           } else {
-            let count = advance(prev);
-            let moved_offset$1 = moved_offset - count;
+            let index4 = node_index - moved_offset;
+            let changes$1 = prepend(remove2(index4), changes);
             let events$1 = remove_child(events, path, node_index, prev);
-            let remove3 = remove_key(prev.key, count);
-            let changes$1 = prepend(remove3, changes);
+            let moved_offset$1 = moved_offset - 1;
             loop$old = old_remaining;
             loop$old_keyed = old_keyed;
             loop$new = new$8;
@@ -3877,9 +3239,8 @@ function do_diff(loop$old, loop$old_keyed, loop$new, loop$new_keyed, loop$moved,
             loop$mapper = mapper;
             loop$events = events$1;
           }
-        } else if (prev_does_exist instanceof Ok) {
+        } else if (prev_does_exist) {
           let before = node_index - moved_offset;
-          let count = advance(next);
           let events$1 = add_child(
             events,
             mapper,
@@ -3887,16 +3248,16 @@ function do_diff(loop$old, loop$old_keyed, loop$new, loop$new_keyed, loop$moved,
             node_index,
             next
           );
-          let insert5 = insert4(toList([next]), before);
-          let changes$1 = prepend(insert5, changes);
+          let insert4 = insert3(toList([next]), before);
+          let changes$1 = prepend(insert4, changes);
           loop$old = old;
           loop$old_keyed = old_keyed;
           loop$new = new_remaining;
           loop$new_keyed = new_keyed;
           loop$moved = moved;
-          loop$moved_offset = moved_offset + count;
+          loop$moved_offset = moved_offset + 1;
           loop$removed = removed;
-          loop$node_index = node_index + count;
+          loop$node_index = node_index + 1;
           loop$patch_index = patch_index;
           loop$path = path;
           loop$changes = changes$1;
@@ -3904,13 +3265,7 @@ function do_diff(loop$old, loop$old_keyed, loop$new, loop$new_keyed, loop$moved,
           loop$mapper = mapper;
           loop$events = events$1;
         } else {
-          let prev_count = advance(prev);
-          let next_count = advance(next);
-          let change = replace2(
-            node_index - moved_offset,
-            prev_count,
-            next
-          );
+          let change = replace2(node_index - moved_offset, next);
           let _block;
           let _pipe = events;
           let _pipe$1 = remove_child(_pipe, path, node_index, prev);
@@ -3921,9 +3276,9 @@ function do_diff(loop$old, loop$old_keyed, loop$new, loop$new_keyed, loop$moved,
           loop$new = new_remaining;
           loop$new_keyed = new_keyed;
           loop$moved = moved;
-          loop$moved_offset = moved_offset - prev_count + next_count;
+          loop$moved_offset = moved_offset;
           loop$removed = removed;
-          loop$node_index = node_index + next_count;
+          loop$node_index = node_index + 1;
           loop$patch_index = patch_index;
           loop$path = path;
           loop$changes = prepend(change, changes);
@@ -3940,51 +3295,55 @@ function do_diff(loop$old, loop$old_keyed, loop$new, loop$new_keyed, loop$moved,
             let new$1 = new$8.tail;
             let prev$1 = $;
             let old$1 = old.tail;
-            let node_index$1 = node_index + 1;
-            let prev_count = prev$1.children_count;
-            let next_count = next$1.children_count;
             let composed_mapper = compose_mapper(mapper, next$1.mapper);
+            let child_path = add2(path, node_index, next$1.key);
             let child = do_diff(
               prev$1.children,
               prev$1.keyed_children,
               next$1.children,
               next$1.keyed_children,
-              empty_set(),
-              moved_offset,
+              empty2(),
               0,
-              node_index$1,
-              -1,
-              path,
+              0,
+              0,
+              node_index,
+              child_path,
               empty_list,
-              children,
+              empty_list,
               composed_mapper,
               events
             );
             let _block;
-            let $2 = child.patch.removed > 0;
-            if ($2) {
-              let remove_from = node_index$1 + next_count - moved_offset;
-              let patch = remove2(remove_from, child.patch.removed);
-              _block = append(
-                child.patch.changes,
-                prepend(patch, changes)
-              );
+            let $2 = child.patch;
+            let $3 = $2.children;
+            if ($3 instanceof Empty) {
+              let $4 = $2.changes;
+              if ($4 instanceof Empty) {
+                let $5 = $2.removed;
+                if ($5 === 0) {
+                  _block = children;
+                } else {
+                  _block = prepend(child.patch, children);
+                }
+              } else {
+                _block = prepend(child.patch, children);
+              }
             } else {
-              _block = append(child.patch.changes, changes);
+              _block = prepend(child.patch, children);
             }
-            let changes$1 = _block;
+            let children$1 = _block;
             loop$old = old$1;
             loop$old_keyed = old_keyed;
             loop$new = new$1;
             loop$new_keyed = new_keyed;
             loop$moved = moved;
-            loop$moved_offset = moved_offset + next_count - prev_count;
+            loop$moved_offset = moved_offset;
             loop$removed = removed;
-            loop$node_index = node_index$1 + next_count;
+            loop$node_index = node_index + 1;
             loop$patch_index = patch_index;
             loop$path = path;
-            loop$changes = changes$1;
-            loop$children = child.patch.children;
+            loop$changes = changes;
+            loop$children = children$1;
             loop$mapper = mapper;
             loop$events = child.events;
           } else {
@@ -3992,13 +3351,7 @@ function do_diff(loop$old, loop$old_keyed, loop$new, loop$new_keyed, loop$moved,
             let new_remaining = new$8.tail;
             let prev$1 = $;
             let old_remaining = old.tail;
-            let prev_count = advance(prev$1);
-            let next_count = advance(next$1);
-            let change = replace2(
-              node_index - moved_offset,
-              prev_count,
-              next$1
-            );
+            let change = replace2(node_index - moved_offset, next$1);
             let _block;
             let _pipe = events;
             let _pipe$1 = remove_child(_pipe, path, node_index, prev$1);
@@ -4015,9 +3368,9 @@ function do_diff(loop$old, loop$old_keyed, loop$new, loop$new_keyed, loop$moved,
             loop$new = new_remaining;
             loop$new_keyed = new_keyed;
             loop$moved = moved;
-            loop$moved_offset = moved_offset - prev_count + next_count;
+            loop$moved_offset = moved_offset;
             loop$removed = removed;
-            loop$node_index = node_index + next_count;
+            loop$node_index = node_index + 1;
             loop$patch_index = patch_index;
             loop$path = path;
             loop$changes = prepend(change, changes);
@@ -4054,16 +3407,15 @@ function do_diff(loop$old, loop$old_keyed, loop$new, loop$new_keyed, loop$moved,
                 empty_list,
                 empty_list
               );
-              let added_attrs = $2.added;
-              let removed_attrs = $2.removed;
-              let events$1 = $2.events;
+              let added_attrs;
+              let removed_attrs;
+              let events$1;
+              added_attrs = $2.added;
+              removed_attrs = $2.removed;
+              events$1 = $2.events;
               let _block;
-              if (removed_attrs instanceof Empty) {
-                if (added_attrs instanceof Empty) {
-                  _block = empty_list;
-                } else {
-                  _block = toList([update(added_attrs, removed_attrs)]);
-                }
+              if (removed_attrs instanceof Empty && added_attrs instanceof Empty) {
+                _block = empty_list;
               } else {
                 _block = toList([update(added_attrs, removed_attrs)]);
               }
@@ -4073,7 +3425,7 @@ function do_diff(loop$old, loop$old_keyed, loop$new, loop$new_keyed, loop$moved,
                 prev$1.keyed_children,
                 next$1.children,
                 next$1.keyed_children,
-                empty_set(),
+                empty2(),
                 0,
                 0,
                 0,
@@ -4122,13 +3474,7 @@ function do_diff(loop$old, loop$old_keyed, loop$new, loop$new_keyed, loop$moved,
               let new_remaining = new$8.tail;
               let prev$2 = $;
               let old_remaining = old.tail;
-              let prev_count = advance(prev$2);
-              let next_count = advance(next$2);
-              let change = replace2(
-                node_index - moved_offset,
-                prev_count,
-                next$2
-              );
+              let change = replace2(node_index - moved_offset, next$2);
               let _block;
               let _pipe = events;
               let _pipe$1 = remove_child(
@@ -4150,9 +3496,9 @@ function do_diff(loop$old, loop$old_keyed, loop$new, loop$new_keyed, loop$moved,
               loop$new = new_remaining;
               loop$new_keyed = new_keyed;
               loop$moved = moved;
-              loop$moved_offset = moved_offset - prev_count + next_count;
+              loop$moved_offset = moved_offset;
               loop$removed = removed;
-              loop$node_index = node_index + next_count;
+              loop$node_index = node_index + 1;
               loop$patch_index = patch_index;
               loop$path = path;
               loop$changes = prepend(change, changes);
@@ -4165,13 +3511,7 @@ function do_diff(loop$old, loop$old_keyed, loop$new, loop$new_keyed, loop$moved,
             let new_remaining = new$8.tail;
             let prev$1 = $;
             let old_remaining = old.tail;
-            let prev_count = advance(prev$1);
-            let next_count = advance(next$1);
-            let change = replace2(
-              node_index - moved_offset,
-              prev_count,
-              next$1
-            );
+            let change = replace2(node_index - moved_offset, next$1);
             let _block;
             let _pipe = events;
             let _pipe$1 = remove_child(_pipe, path, node_index, prev$1);
@@ -4188,9 +3528,9 @@ function do_diff(loop$old, loop$old_keyed, loop$new, loop$new_keyed, loop$moved,
             loop$new = new_remaining;
             loop$new_keyed = new_keyed;
             loop$moved = moved;
-            loop$moved_offset = moved_offset - prev_count + next_count;
+            loop$moved_offset = moved_offset;
             loop$removed = removed;
-            loop$node_index = node_index + next_count;
+            loop$node_index = node_index + 1;
             loop$patch_index = patch_index;
             loop$path = path;
             loop$changes = prepend(change, changes);
@@ -4250,13 +3590,7 @@ function do_diff(loop$old, loop$old_keyed, loop$new, loop$new_keyed, loop$moved,
             let new_remaining = new$8.tail;
             let prev$1 = $;
             let old_remaining = old.tail;
-            let prev_count = advance(prev$1);
-            let next_count = advance(next$1);
-            let change = replace2(
-              node_index - moved_offset,
-              prev_count,
-              next$1
-            );
+            let change = replace2(node_index - moved_offset, next$1);
             let _block;
             let _pipe = events;
             let _pipe$1 = remove_child(_pipe, path, node_index, prev$1);
@@ -4273,9 +3607,9 @@ function do_diff(loop$old, loop$old_keyed, loop$new, loop$new_keyed, loop$moved,
             loop$new = new_remaining;
             loop$new_keyed = new_keyed;
             loop$moved = moved;
-            loop$moved_offset = moved_offset - prev_count + next_count;
+            loop$moved_offset = moved_offset;
             loop$removed = removed;
-            loop$node_index = node_index + next_count;
+            loop$node_index = node_index + 1;
             loop$patch_index = patch_index;
             loop$path = path;
             loop$changes = prepend(change, changes);
@@ -4302,16 +3636,15 @@ function do_diff(loop$old, loop$old_keyed, loop$new, loop$new_keyed, loop$moved,
               empty_list,
               empty_list
             );
-            let added_attrs = $2.added;
-            let removed_attrs = $2.removed;
-            let events$1 = $2.events;
+            let added_attrs;
+            let removed_attrs;
+            let events$1;
+            added_attrs = $2.added;
+            removed_attrs = $2.removed;
+            events$1 = $2.events;
             let _block;
-            if (removed_attrs instanceof Empty) {
-              if (added_attrs instanceof Empty) {
-                _block = empty_list;
-              } else {
-                _block = toList([update(added_attrs, removed_attrs)]);
-              }
+            if (removed_attrs instanceof Empty && added_attrs instanceof Empty) {
+              _block = empty_list;
             } else {
               _block = toList([update(added_attrs, removed_attrs)]);
             }
@@ -4356,13 +3689,7 @@ function do_diff(loop$old, loop$old_keyed, loop$new, loop$new_keyed, loop$moved,
             let new_remaining = new$8.tail;
             let prev$1 = $;
             let old_remaining = old.tail;
-            let prev_count = advance(prev$1);
-            let next_count = advance(next$1);
-            let change = replace2(
-              node_index - moved_offset,
-              prev_count,
-              next$1
-            );
+            let change = replace2(node_index - moved_offset, next$1);
             let _block;
             let _pipe = events;
             let _pipe$1 = remove_child(_pipe, path, node_index, prev$1);
@@ -4379,9 +3706,9 @@ function do_diff(loop$old, loop$old_keyed, loop$new, loop$new_keyed, loop$moved,
             loop$new = new_remaining;
             loop$new_keyed = new_keyed;
             loop$moved = moved;
-            loop$moved_offset = moved_offset - prev_count + next_count;
+            loop$moved_offset = moved_offset;
             loop$removed = removed;
-            loop$node_index = node_index + next_count;
+            loop$node_index = node_index + 1;
             loop$patch_index = patch_index;
             loop$path = path;
             loop$changes = prepend(change, changes);
@@ -4400,7 +3727,7 @@ function diff(events, old, new$8) {
     empty2(),
     toList([new$8]),
     empty2(),
-    empty_set(),
+    empty2(),
     0,
     0,
     0,
@@ -4414,8 +3741,56 @@ function diff(events, old, new$8) {
 }
 
 // build/dev/javascript/lustre/lustre/vdom/reconciler.ffi.mjs
+var setTimeout = globalThis.setTimeout;
+var clearTimeout = globalThis.clearTimeout;
+var createElementNS = (ns, name) => document().createElementNS(ns, name);
+var createTextNode = (data) => document().createTextNode(data);
+var createDocumentFragment = () => document().createDocumentFragment();
+var insertBefore = (parent, node, reference) => parent.insertBefore(node, reference);
+var moveBefore = SUPPORTS_MOVE_BEFORE ? (parent, node, reference) => parent.moveBefore(node, reference) : insertBefore;
+var removeChild = (parent, child) => parent.removeChild(child);
+var getAttribute = (node, name) => node.getAttribute(name);
+var setAttribute = (node, name, value2) => node.setAttribute(name, value2);
+var removeAttribute = (node, name) => node.removeAttribute(name);
+var addEventListener = (node, name, handler, options) => node.addEventListener(name, handler, options);
+var removeEventListener = (node, name, handler) => node.removeEventListener(name, handler);
+var setInnerHtml = (node, innerHtml) => node.innerHTML = innerHtml;
+var setData = (node, data) => node.data = data;
+var meta = Symbol("lustre");
+var MetadataNode = class {
+  constructor(kind, parent, node, key) {
+    this.kind = kind;
+    this.key = key;
+    this.parent = parent;
+    this.children = [];
+    this.node = node;
+    this.handlers = /* @__PURE__ */ new Map();
+    this.throttles = /* @__PURE__ */ new Map();
+    this.debouncers = /* @__PURE__ */ new Map();
+  }
+  get parentNode() {
+    return this.kind === fragment_kind ? this.node.parentNode : this.node;
+  }
+};
+var insertMetadataChild = (kind, parent, node, index4, key) => {
+  const child = new MetadataNode(kind, parent, node, key);
+  node[meta] = child;
+  parent?.children.splice(index4, 0, child);
+  return child;
+};
+var getPath = (node) => {
+  let path = "";
+  for (let current = node[meta]; current.parent; current = current.parent) {
+    if (current.key) {
+      path = `${separator_element}${current.key}${path}`;
+    } else {
+      const index4 = current.parent.children.indexOf(current);
+      path = `${separator_element}${index4}${path}`;
+    }
+  }
+  return path.slice(1);
+};
 var Reconciler = class {
-  offset = 0;
   #root = null;
   #dispatch = () => {
   };
@@ -4428,195 +3803,209 @@ var Reconciler = class {
     this.#exposeKeys = exposeKeys;
   }
   mount(vdom) {
-    appendChild(this.#root, this.#createChild(this.#root, 0, vdom));
+    insertMetadataChild(element_kind, null, this.#root, 0, null);
+    this.#insertChild(this.#root, null, this.#root[meta], 0, vdom);
   }
-  #stack = [];
   push(patch) {
-    const offset = this.offset;
-    if (offset) {
-      iterate(patch.changes, (change) => {
-        switch (change.kind) {
-          case insert_kind:
-          case move_kind:
-            change.before = (change.before | 0) + offset;
-            break;
-          case remove_kind:
-          case replace_kind:
-            change.from = (change.from | 0) + offset;
-            break;
-        }
-      });
-      iterate(patch.children, (child) => {
-        child.index = (child.index | 0) + offset;
-      });
-    }
-    this.#stack.push({ node: this.#root, patch });
+    this.#stack.push({ node: this.#root[meta], patch });
     this.#reconcile();
   }
   // PATCHING ------------------------------------------------------------------
+  #stack = [];
   #reconcile() {
-    const self = this;
-    while (self.#stack.length) {
-      const { node, patch } = self.#stack.pop();
-      iterate(patch.changes, (change) => {
-        switch (change.kind) {
-          case insert_kind:
-            self.#insert(node, change.children, change.before);
-            break;
-          case move_kind:
-            self.#move(node, change.key, change.before, change.count);
-            break;
-          case remove_key_kind:
-            self.#removeKey(node, change.key, change.count);
-            break;
-          case remove_kind:
-            self.#remove(node, change.from, change.count);
-            break;
-          case replace_kind:
-            self.#replace(node, change.from, change.count, change.with);
-            break;
-          case replace_text_kind:
-            self.#replaceText(node, change.content);
-            break;
-          case replace_inner_html_kind:
-            self.#replaceInnerHtml(node, change.inner_html);
-            break;
-          case update_kind:
-            self.#update(node, change.added, change.removed);
-            break;
-        }
-      });
-      if (patch.removed) {
-        self.#remove(
-          node,
-          node.childNodes.length - patch.removed,
-          patch.removed
-        );
+    const stack = this.#stack;
+    while (stack.length) {
+      const { node, patch } = stack.pop();
+      const { children: childNodes } = node;
+      const { changes, removed, children: childPatches } = patch;
+      iterate(changes, (change) => this.#patch(node, change));
+      if (removed) {
+        this.#removeChildren(node, childNodes.length - removed, removed);
       }
-      let lastIndex = -1;
-      let lastChild = null;
-      iterate(patch.children, (child) => {
-        const index4 = child.index | 0;
-        const next = lastChild && lastIndex - index4 === 1 ? lastChild.previousSibling : childAt(node, index4);
-        self.#stack.push({ node: next, patch: child });
-        lastChild = next;
-        lastIndex = index4;
+      iterate(childPatches, (childPatch) => {
+        const child = childNodes[childPatch.index | 0];
+        this.#stack.push({ node: child, patch: childPatch });
       });
+    }
+  }
+  #patch(node, change) {
+    switch (change.kind) {
+      case replace_text_kind:
+        this.#replaceText(node, change);
+        break;
+      case replace_inner_html_kind:
+        this.#replaceInnerHtml(node, change);
+        break;
+      case update_kind:
+        this.#update(node, change);
+        break;
+      case move_kind:
+        this.#move(node, change);
+        break;
+      case remove_kind:
+        this.#remove(node, change);
+        break;
+      case replace_kind:
+        this.#replace(node, change);
+        break;
+      case insert_kind:
+        this.#insert(node, change);
+        break;
     }
   }
   // CHANGES -------------------------------------------------------------------
-  #insert(node, children, before) {
+  #insert(parent, { children, before }) {
     const fragment3 = createDocumentFragment();
-    let childIndex = before | 0;
-    iterate(children, (child) => {
-      const el = this.#createChild(node, childIndex, child);
-      appendChild(fragment3, el);
-      childIndex += advance(child);
-    });
-    insertBefore(node, fragment3, childAt(node, before));
+    const beforeEl = this.#getReference(parent, before);
+    this.#insertChildren(fragment3, null, parent, before | 0, children);
+    insertBefore(parent.parentNode, fragment3, beforeEl);
   }
-  #move(node, key, before, count) {
-    let el = getKeyedChild(node, key);
-    const beforeEl = childAt(node, before);
-    for (let i = 0; i < count && el !== null; ++i) {
-      const next = el.nextSibling;
-      if (SUPPORTS_MOVE_BEFORE) {
-        node.moveBefore(el, beforeEl);
-      } else {
-        insertBefore(node, el, beforeEl);
+  #replace(parent, { index: index4, with: child }) {
+    this.#removeChildren(parent, index4 | 0, 1);
+    const beforeEl = this.#getReference(parent, index4);
+    this.#insertChild(parent.parentNode, beforeEl, parent, index4 | 0, child);
+  }
+  #getReference(node, index4) {
+    index4 = index4 | 0;
+    const { children } = node;
+    const childCount = children.length;
+    if (index4 < childCount) {
+      return children[index4].node;
+    }
+    let lastChild = children[childCount - 1];
+    if (!lastChild && node.kind !== fragment_kind) return null;
+    if (!lastChild) lastChild = node;
+    while (lastChild.kind === fragment_kind && lastChild.children.length) {
+      lastChild = lastChild.children[lastChild.children.length - 1];
+    }
+    return lastChild.node.nextSibling;
+  }
+  #move(parent, { key, before }) {
+    before = before | 0;
+    const { children, parentNode } = parent;
+    const beforeEl = children[before].node;
+    let prev = children[before];
+    for (let i = before + 1; i < children.length; ++i) {
+      const next = children[i];
+      children[i] = prev;
+      prev = next;
+      if (next.key === key) {
+        children[before] = next;
+        break;
       }
-      el = next;
+    }
+    const { kind, node, children: prevChildren } = prev;
+    moveBefore(parentNode, node, beforeEl);
+    if (kind === fragment_kind) {
+      this.#moveChildren(parentNode, prevChildren, beforeEl);
     }
   }
-  #removeKey(node, key, count) {
-    this.#removeFromChild(node, getKeyedChild(node, key), count);
-  }
-  #remove(node, from, count) {
-    this.#removeFromChild(node, childAt(node, from), count);
-  }
-  #removeFromChild(parent, child, count) {
-    while (count-- > 0 && child !== null) {
-      const next = child.nextSibling;
-      const key = child[meta].key;
-      if (key) {
-        parent[meta].keyedChildren.delete(key);
+  #moveChildren(domParent, children, beforeEl) {
+    for (let i = 0; i < children.length; ++i) {
+      const { kind, node, children: nestedChildren } = children[i];
+      moveBefore(domParent, node, beforeEl);
+      if (kind === fragment_kind) {
+        this.#moveChildren(domParent, nestedChildren, beforeEl);
       }
-      for (const [_, { timeout }] of child[meta].debouncers ?? []) {
+    }
+  }
+  #remove(parent, { index: index4 }) {
+    this.#removeChildren(parent, index4, 1);
+  }
+  #removeChildren(parent, index4, count) {
+    const { children, parentNode } = parent;
+    const deleted = children.splice(index4, count);
+    for (let i = 0; i < deleted.length; ++i) {
+      const { kind, node, children: nestedChildren } = deleted[i];
+      removeChild(parentNode, node);
+      this.#removeDebouncers(deleted[i]);
+      if (kind === fragment_kind) {
+        deleted.push(...nestedChildren);
+      }
+    }
+  }
+  #removeDebouncers(node) {
+    const { debouncers, children } = node;
+    for (const { timeout } of debouncers.values()) {
+      if (timeout) {
         clearTimeout(timeout);
       }
-      parent.removeChild(child);
-      child = next;
     }
+    debouncers.clear();
+    iterate(children, (child) => this.#removeDebouncers(child));
   }
-  #replace(parent, from, count, child) {
-    this.#remove(parent, from, count);
-    const el = this.#createChild(parent, from, child);
-    insertBefore(parent, el, childAt(parent, from));
-  }
-  #replaceText(node, content) {
-    node.data = content ?? "";
-  }
-  #replaceInnerHtml(node, inner_html) {
-    node.innerHTML = inner_html ?? "";
-  }
-  #update(node, added, removed) {
-    iterate(removed, (attribute3) => {
-      const name = attribute3.name;
-      if (node[meta].handlers.has(name)) {
-        node.removeEventListener(name, handleEvent);
-        node[meta].handlers.delete(name);
-        if (node[meta].throttles.has(name)) {
-          node[meta].throttles.delete(name);
-        }
-        if (node[meta].debouncers.has(name)) {
-          clearTimeout(node[meta].debouncers.get(name).timeout);
-          node[meta].debouncers.delete(name);
-        }
+  #update({ node, handlers, throttles, debouncers }, { added, removed }) {
+    iterate(removed, ({ name }) => {
+      if (handlers.delete(name)) {
+        removeEventListener(node, name, handleEvent);
+        this.#updateDebounceThrottle(throttles, name, 0);
+        this.#updateDebounceThrottle(debouncers, name, 0);
       } else {
-        node.removeAttribute(name);
+        removeAttribute(node, name);
         SYNCED_ATTRIBUTES[name]?.removed?.(node, name);
       }
     });
-    iterate(added, (attribute3) => {
-      this.#createAttribute(node, attribute3);
-    });
+    iterate(added, (attribute3) => this.#createAttribute(node, attribute3));
   }
-  // CONSTRUCTORS --------------------------------------------------------------
-  #createChild(parent, index4, vnode) {
+  #replaceText({ node }, { content }) {
+    setData(node, content ?? "");
+  }
+  #replaceInnerHtml({ node }, { inner_html }) {
+    setInnerHtml(node, inner_html ?? "");
+  }
+  // INSERT --------------------------------------------------------------------
+  #insertChildren(domParent, beforeEl, metaParent, index4, children) {
+    iterate(
+      children,
+      (child) => this.#insertChild(domParent, beforeEl, metaParent, index4++, child)
+    );
+  }
+  #insertChild(domParent, beforeEl, metaParent, index4, vnode) {
     switch (vnode.kind) {
       case element_kind: {
-        const node = createChildElement(parent, index4, vnode);
-        this.#createAttributes(node, vnode);
-        this.#insert(node, vnode.children);
-        return node;
+        const node = this.#createElement(metaParent, index4, vnode);
+        this.#insertChildren(node, null, node[meta], 0, vnode.children);
+        insertBefore(domParent, node, beforeEl);
+        break;
       }
       case text_kind: {
-        return createChildText(parent, index4, vnode);
+        const node = this.#createTextNode(metaParent, index4, vnode);
+        insertBefore(domParent, node, beforeEl);
+        break;
       }
       case fragment_kind: {
-        const node = createDocumentFragment();
-        const head = createChildText(parent, index4, vnode);
-        appendChild(node, head);
-        let childIndex = index4 + 1;
-        iterate(vnode.children, (child) => {
-          appendChild(node, this.#createChild(parent, childIndex, child));
-          childIndex += advance(child);
-        });
-        return node;
+        const head = this.#createTextNode(metaParent, index4, vnode);
+        insertBefore(domParent, head, beforeEl);
+        this.#insertChildren(
+          domParent,
+          beforeEl,
+          head[meta],
+          0,
+          vnode.children
+        );
+        break;
       }
       case unsafe_inner_html_kind: {
-        const node = createChildElement(parent, index4, vnode);
-        this.#createAttributes(node, vnode);
-        this.#replaceInnerHtml(node, vnode.inner_html);
-        return node;
+        const node = this.#createElement(metaParent, index4, vnode);
+        this.#replaceInnerHtml({ node }, vnode);
+        insertBefore(domParent, node, beforeEl);
+        break;
       }
     }
   }
-  #createAttributes(node, { key, attributes }) {
+  #createElement(parent, index4, { kind, key, tag, namespace, attributes }) {
+    const node = createElementNS(namespace || NAMESPACE_HTML, tag);
+    insertMetadataChild(kind, parent, node, index4, key);
     if (this.#exposeKeys && key) {
-      node.setAttribute("data-lustre-key", key);
+      setAttribute(node, "data-lustre-key", key);
     }
     iterate(attributes, (attribute3) => this.#createAttribute(node, attribute3));
+    return node;
+  }
+  #createTextNode(parent, index4, { kind, key, content }) {
+    const node = createTextNode(content ?? "");
+    insertMetadataChild(kind, parent, node, index4, key);
+    return node;
   }
   #createAttribute(node, attribute3) {
     const { debouncers, handlers, throttles } = node[meta];
@@ -4625,9 +4014,6 @@ var Reconciler = class {
       name,
       value: value2,
       prevent_default: prevent,
-      stop_propagation: stop,
-      immediate: immediate2,
-      include,
       debounce: debounceDelay,
       throttle: throttleDelay
     } = attribute3;
@@ -4638,10 +4024,10 @@ var Reconciler = class {
           node.defaultValue = valueOrDefault;
           return;
         }
-        if (valueOrDefault !== node.getAttribute(name)) {
-          node.setAttribute(name, valueOrDefault);
+        if (valueOrDefault !== getAttribute(node, name)) {
+          setAttribute(node, name, valueOrDefault);
         }
-        SYNCED_ATTRIBUTES[name]?.added?.(node, value2);
+        SYNCED_ATTRIBUTES[name]?.added?.(node, valueOrDefault);
         break;
       }
       case property_kind:
@@ -4649,56 +4035,70 @@ var Reconciler = class {
         break;
       case event_kind: {
         if (handlers.has(name)) {
-          node.removeEventListener(name, handleEvent);
+          removeEventListener(node, name, handleEvent);
         }
-        node.addEventListener(name, handleEvent, {
-          passive: prevent.kind === never_kind
-        });
-        if (throttleDelay > 0) {
-          const throttle = throttles.get(name) ?? {};
-          throttle.delay = throttleDelay;
-          throttles.set(name, throttle);
-        } else {
-          throttles.delete(name);
-        }
-        if (debounceDelay > 0) {
-          const debounce = debouncers.get(name) ?? {};
-          debounce.delay = debounceDelay;
-          debouncers.set(name, debounce);
-        } else {
-          clearTimeout(debouncers.get(name)?.timeout);
-          debouncers.delete(name);
-        }
-        handlers.set(name, (event4) => {
-          if (prevent.kind === always_kind) event4.preventDefault();
-          if (stop.kind === always_kind) event4.stopPropagation();
-          const type = event4.type;
-          const path = event4.currentTarget[meta].path;
-          const data = this.#useServerEvents ? createServerEvent(event4, include ?? []) : event4;
-          const throttle = throttles.get(type);
-          if (throttle) {
-            const now = Date.now();
-            const last = throttle.last || 0;
-            if (now > last + throttle.delay) {
-              throttle.last = now;
-              throttle.lastEvent = event4;
-              this.#dispatch(data, path, type, immediate2);
-            }
-          }
-          const debounce = debouncers.get(type);
-          if (debounce) {
-            clearTimeout(debounce.timeout);
-            debounce.timeout = setTimeout(() => {
-              if (event4 === throttles.get(type)?.lastEvent) return;
-              this.#dispatch(data, path, type, immediate2);
-            }, debounce.delay);
-          }
-          if (!throttle && !debounce) {
-            this.#dispatch(data, path, type, immediate2);
-          }
-        });
+        const passive = prevent.kind === never_kind;
+        addEventListener(node, name, handleEvent, { passive });
+        this.#updateDebounceThrottle(throttles, name, throttleDelay);
+        this.#updateDebounceThrottle(debouncers, name, debounceDelay);
+        handlers.set(name, (event4) => this.#handleEvent(attribute3, event4));
         break;
       }
+    }
+  }
+  #updateDebounceThrottle(map4, name, delay) {
+    const debounceOrThrottle = map4.get(name);
+    if (delay > 0) {
+      if (debounceOrThrottle) {
+        debounceOrThrottle.delay = delay;
+      } else {
+        map4.set(name, { delay });
+      }
+    } else if (debounceOrThrottle) {
+      const { timeout } = debounceOrThrottle;
+      if (timeout) {
+        clearTimeout(timeout);
+      }
+      map4.delete(name);
+    }
+  }
+  #handleEvent(attribute3, event4) {
+    const { currentTarget, type } = event4;
+    const { debouncers, throttles } = currentTarget[meta];
+    const path = getPath(currentTarget);
+    const {
+      prevent_default: prevent,
+      stop_propagation: stop,
+      include,
+      immediate: immediate2
+    } = attribute3;
+    if (prevent.kind === always_kind) event4.preventDefault();
+    if (stop.kind === always_kind) event4.stopPropagation();
+    if (type === "submit") {
+      event4.detail ??= {};
+      event4.detail.formData = [...new FormData(event4.target).entries()];
+    }
+    const data = this.#useServerEvents ? createServerEvent(event4, include ?? []) : event4;
+    const throttle = throttles.get(type);
+    if (throttle) {
+      const now = Date.now();
+      const last = throttle.last || 0;
+      if (now > last + throttle.delay) {
+        throttle.last = now;
+        throttle.lastEvent = event4;
+        this.#dispatch(data, path, type, immediate2);
+      }
+    }
+    const debounce = debouncers.get(type);
+    if (debounce) {
+      clearTimeout(debounce.timeout);
+      debounce.timeout = setTimeout(() => {
+        if (event4 === throttles.get(type)?.lastEvent) return;
+        this.#dispatch(data, path, type, immediate2);
+      }, debounce.delay);
+    }
+    if (!throttle && !debounce) {
+      this.#dispatch(data, path, type, immediate2);
     }
   }
 };
@@ -4708,59 +4108,14 @@ var iterate = (list4, callback) => {
       callback(list4[i]);
     }
   } else if (list4) {
-    for (list4; list4.tail; list4 = list4.tail) {
+    for (list4; list4.head; list4 = list4.tail) {
       callback(list4.head);
     }
   }
 };
-var appendChild = (node, child) => node.appendChild(child);
-var insertBefore = (parent, node, referenceNode) => parent.insertBefore(node, referenceNode ?? null);
-var createChildElement = (parent, index4, { key, tag, namespace }) => {
-  const node = document().createElementNS(namespace || NAMESPACE_HTML, tag);
-  initialiseMetadata(parent, node, index4, key);
-  return node;
-};
-var createChildText = (parent, index4, { key, content }) => {
-  const node = document().createTextNode(content ?? "");
-  initialiseMetadata(parent, node, index4, key);
-  return node;
-};
-var createDocumentFragment = () => document().createDocumentFragment();
-var childAt = (node, at) => node.childNodes[at | 0];
-var meta = Symbol("lustre");
-var initialiseMetadata = (parent, node, index4 = 0, key = "") => {
-  const segment = `${key || index4}`;
-  switch (node.nodeType) {
-    case ELEMENT_NODE:
-    case DOCUMENT_FRAGMENT_NODE:
-      node[meta] = {
-        key,
-        path: segment,
-        keyedChildren: /* @__PURE__ */ new Map(),
-        handlers: /* @__PURE__ */ new Map(),
-        throttles: /* @__PURE__ */ new Map(),
-        debouncers: /* @__PURE__ */ new Map()
-      };
-      break;
-    case TEXT_NODE:
-      node[meta] = { key };
-      break;
-  }
-  if (parent && parent[meta] && key) {
-    parent[meta].keyedChildren.set(key, new WeakRef(node));
-  }
-  if (parent && parent[meta] && parent[meta].path) {
-    node[meta].path = `${parent[meta].path}${separator_element}${segment}`;
-  }
-};
-var getKeyedChild = (node, key) => node[meta].keyedChildren.get(key).deref();
 var handleEvent = (event4) => {
-  const target = event4.currentTarget;
-  const handler = target[meta].handlers.get(event4.type);
-  if (event4.type === "submit") {
-    event4.detail ??= {};
-    event4.detail.formData = [...new FormData(event4.target).entries()];
-  }
+  const { currentTarget, type } = event4;
+  const handler = currentTarget[meta].handlers.get(type);
   handler(event4);
 };
 var createServerEvent = (event4, include = []) => {
@@ -4784,7 +4139,7 @@ var createServerEvent = (event4, include = []) => {
   }
   return data;
 };
-var syncedBooleanAttribute = (name) => {
+var syncedBooleanAttribute = /* @__NO_SIDE_EFFECTS__ */ (name) => {
   return {
     added(node) {
       node[name] = true;
@@ -4794,7 +4149,7 @@ var syncedBooleanAttribute = (name) => {
     }
   };
 };
-var syncedAttribute = (name) => {
+var syncedAttribute = /* @__NO_SIDE_EFFECTS__ */ (name) => {
   return {
     added(node, value2) {
       node[name] = value2;
@@ -4802,12 +4157,14 @@ var syncedAttribute = (name) => {
   };
 };
 var SYNCED_ATTRIBUTES = {
-  checked: syncedBooleanAttribute("checked"),
-  selected: syncedBooleanAttribute("selected"),
-  value: syncedAttribute("value"),
+  checked: /* @__PURE__ */ syncedBooleanAttribute("checked"),
+  selected: /* @__PURE__ */ syncedBooleanAttribute("selected"),
+  value: /* @__PURE__ */ syncedAttribute("value"),
   autofocus: {
     added(node) {
-      queueMicrotask(() => node.focus?.());
+      queueMicrotask(() => {
+        node.focus?.();
+      });
     }
   },
   autoplay: {
@@ -4821,34 +4178,125 @@ var SYNCED_ATTRIBUTES = {
   }
 };
 
+// build/dev/javascript/lustre/lustre/element/keyed.mjs
+function do_extract_keyed_children(loop$key_children_pairs, loop$keyed_children, loop$children) {
+  while (true) {
+    let key_children_pairs = loop$key_children_pairs;
+    let keyed_children = loop$keyed_children;
+    let children = loop$children;
+    if (key_children_pairs instanceof Empty) {
+      return [keyed_children, reverse(children)];
+    } else {
+      let rest = key_children_pairs.tail;
+      let key = key_children_pairs.head[0];
+      let element$1 = key_children_pairs.head[1];
+      let keyed_element = to_keyed(key, element$1);
+      let _block;
+      if (key === "") {
+        _block = keyed_children;
+      } else {
+        _block = insert2(keyed_children, key, keyed_element);
+      }
+      let keyed_children$1 = _block;
+      let children$1 = prepend(keyed_element, children);
+      loop$key_children_pairs = rest;
+      loop$keyed_children = keyed_children$1;
+      loop$children = children$1;
+    }
+  }
+}
+function extract_keyed_children(children) {
+  return do_extract_keyed_children(
+    children,
+    empty2(),
+    empty_list
+  );
+}
+function element3(tag, attributes, children) {
+  let $ = extract_keyed_children(children);
+  let keyed_children;
+  let children$1;
+  keyed_children = $[0];
+  children$1 = $[1];
+  return element(
+    "",
+    identity2,
+    "",
+    tag,
+    attributes,
+    children$1,
+    keyed_children,
+    false,
+    false
+  );
+}
+function namespaced2(namespace, tag, attributes, children) {
+  let $ = extract_keyed_children(children);
+  let keyed_children;
+  let children$1;
+  keyed_children = $[0];
+  children$1 = $[1];
+  return element(
+    "",
+    identity2,
+    namespace,
+    tag,
+    attributes,
+    children$1,
+    keyed_children,
+    false,
+    false
+  );
+}
+function fragment2(children) {
+  let $ = extract_keyed_children(children);
+  let keyed_children;
+  let children$1;
+  keyed_children = $[0];
+  children$1 = $[1];
+  return fragment("", identity2, children$1, keyed_children);
+}
+
 // build/dev/javascript/lustre/lustre/vdom/virtualise.ffi.mjs
 var virtualise = (root3) => {
-  const vdom = virtualiseNode(null, root3, "");
-  if (vdom === null || vdom.children instanceof Empty) {
-    const empty3 = emptyTextNode(root3);
-    root3.appendChild(empty3);
+  const rootMeta = insertMetadataChild(element_kind, null, root3, 0, null);
+  let virtualisableRootChildren = 0;
+  for (let child = root3.firstChild; child; child = child.nextSibling) {
+    if (canVirtualiseNode(child)) virtualisableRootChildren += 1;
+  }
+  if (virtualisableRootChildren === 0) {
+    const placeholder = document().createTextNode("");
+    insertMetadataChild(text_kind, rootMeta, placeholder, 0, null);
+    root3.replaceChildren(placeholder);
     return none2();
-  } else if (vdom.children instanceof NonEmpty && vdom.children.tail instanceof Empty) {
-    return vdom.children.head;
-  } else {
-    const head = emptyTextNode(root3);
-    root3.insertBefore(head, root3.firstChild);
-    return fragment2(vdom.children);
+  }
+  if (virtualisableRootChildren === 1) {
+    const children2 = virtualiseChildNodes(rootMeta, root3);
+    return children2.head[1];
+  }
+  const fragmentHead = document().createTextNode("");
+  const fragmentMeta = insertMetadataChild(fragment_kind, rootMeta, fragmentHead, 0, null);
+  const children = virtualiseChildNodes(fragmentMeta, root3);
+  root3.insertBefore(fragmentHead, root3.firstChild);
+  return fragment2(children);
+};
+var canVirtualiseNode = (node) => {
+  switch (node.nodeType) {
+    case ELEMENT_NODE:
+      return true;
+    case TEXT_NODE:
+      return !!node.data;
+    default:
+      return false;
   }
 };
-var emptyTextNode = (parent) => {
-  const node = document().createTextNode("");
-  initialiseMetadata(parent, node);
-  return node;
-};
-var virtualiseNode = (parent, node, index4) => {
+var virtualiseNode = (meta2, node, key, index4) => {
+  if (!canVirtualiseNode(node)) {
+    return null;
+  }
   switch (node.nodeType) {
     case ELEMENT_NODE: {
-      const key = node.getAttribute("data-lustre-key");
-      initialiseMetadata(parent, node, index4, key);
-      if (key) {
-        node.removeAttribute("data-lustre-key");
-      }
+      const childMeta = insertMetadataChild(element_kind, meta2, node, index4, key);
       const tag = node.localName;
       const namespace = node.namespaceURI;
       const isHtmlElement = !namespace || namespace === NAMESPACE_HTML;
@@ -4856,16 +4304,13 @@ var virtualiseNode = (parent, node, index4) => {
         virtualiseInputEvents(tag, node);
       }
       const attributes = virtualiseAttributes(node);
-      const children = virtualiseChildNodes(node);
-      const vnode = isHtmlElement ? element2(tag, attributes, children) : namespaced(namespace, tag, attributes, children);
-      return key ? to_keyed(key, vnode) : vnode;
+      const children = virtualiseChildNodes(childMeta, node);
+      const vnode = isHtmlElement ? element3(tag, attributes, children) : namespaced2(namespace, tag, attributes, children);
+      return vnode;
     }
     case TEXT_NODE:
-      initialiseMetadata(parent, node, index4);
-      return node.data ? text2(node.data) : null;
-    case DOCUMENT_FRAGMENT_NODE:
-      initialiseMetadata(parent, node, index4);
-      return node.childNodes.length > 0 ? fragment2(virtualiseChildNodes(node)) : null;
+      insertMetadataChild(text_kind, meta2, node, index4, null);
+      return text2(node.data);
     default:
       return null;
   }
@@ -4887,16 +4332,20 @@ var virtualiseInputEvents = (tag, node) => {
     }
   });
 };
-var virtualiseChildNodes = (node) => {
+var virtualiseChildNodes = (meta2, node) => {
   let children = null;
-  let index4 = 0;
   let child = node.firstChild;
   let ptr = null;
+  let index4 = 0;
   while (child) {
-    const vnode = virtualiseNode(node, child, index4);
+    const key = child.nodeType === ELEMENT_NODE ? child.getAttribute("data-lustre-key") : null;
+    if (key != null) {
+      child.removeAttribute("data-lustre-key");
+    }
+    const vnode = virtualiseNode(meta2, child, key, index4);
     const next = child.nextSibling;
     if (vnode) {
-      const list_node = new NonEmpty(vnode, null);
+      const list_node = new NonEmpty([key ?? "", vnode], null);
       if (ptr) {
         ptr = ptr.tail = list_node;
       } else {
@@ -4916,10 +4365,11 @@ var virtualiseAttributes = (node) => {
   let index4 = node.attributes.length;
   let attributes = empty_list;
   while (index4-- > 0) {
-    attributes = new NonEmpty(
-      virtualiseAttribute(node.attributes[index4]),
-      attributes
-    );
+    const attr = node.attributes[index4];
+    if (attr.name === "xmlns") {
+      continue;
+    }
+    attributes = new NonEmpty(virtualiseAttribute(attr), attributes);
   }
   return attributes;
 };
@@ -4937,6 +4387,24 @@ var Runtime = class {
     this.#model = model;
     this.#view = view2;
     this.#update = update3;
+    this.root.addEventListener("context-request", (event4) => {
+      if (!(event4.context && event4.callback)) return;
+      if (!this.#contexts.has(event4.context)) return;
+      event4.stopImmediatePropagation();
+      const context = this.#contexts.get(event4.context);
+      if (event4.subscribe) {
+        const callbackRef = new WeakRef(event4.callback);
+        const unsubscribe = () => {
+          context.subscribers = context.subscribers.filter(
+            (subscriber) => subscriber !== callbackRef
+          );
+        };
+        context.subscribers.push([callbackRef, unsubscribe]);
+        event4.callback(context.value, unsubscribe);
+      } else {
+        event4.callback(context.value);
+      }
+    });
     this.#reconciler = new Reconciler(this.root, (event4, path, name) => {
       const [events, result] = handle(this.#events, path, name, event4);
       this.#events = events;
@@ -4954,9 +4422,6 @@ var Runtime = class {
   }
   // PUBLIC API ----------------------------------------------------------------
   root = null;
-  set offset(offset) {
-    this.#reconciler.offset = offset;
-  }
   dispatch(msg, immediate2 = false) {
     this.#shouldFlush ||= immediate2;
     if (this.#shouldQueue) {
@@ -4977,6 +4442,27 @@ var Runtime = class {
       })
     );
   }
+  // Provide a context value for any child nodes that request it using the given
+  // key. If the key already exists, any existing subscribers will be notified
+  // of the change. Otherwise, we store the value and wait for any `context-request`
+  // events to come in.
+  provide(key, value2) {
+    if (!this.#contexts.has(key)) {
+      this.#contexts.set(key, { value: value2, subscribers: [] });
+    } else {
+      const context = this.#contexts.get(key);
+      context.value = value2;
+      for (let i = context.subscribers.length - 1; i >= 0; i--) {
+        const [subscriberRef, unsubscribe] = context.subscribers[i];
+        const subscriber = subscriberRef.deref();
+        if (!subscriber) {
+          context.subscribers.splice(i, 1);
+          continue;
+        }
+        subscriber(value2, unsubscribe);
+      }
+    }
+  }
   // PRIVATE API ---------------------------------------------------------------
   #model;
   #view;
@@ -4984,6 +4470,7 @@ var Runtime = class {
   #vdom;
   #events;
   #reconciler;
+  #contexts = /* @__PURE__ */ new Map();
   #shouldQueue = false;
   #queue = [];
   #beforePaint = empty_list;
@@ -4995,7 +4482,8 @@ var Runtime = class {
     emit: (event4, data) => this.emit(event4, data),
     select: () => {
     },
-    root: () => this.root
+    root: () => this.root,
+    provide: (key, value2) => this.provide(key, value2)
   };
   // A `#tick` is where we process effects and trigger any synchronous updates.
   // Once a tick has been processed a render will be scheduled if none is already.
@@ -5060,7 +4548,7 @@ function listAppend(a, b) {
   } else if (b instanceof Empty) {
     return a;
   } else {
-    return append(a, b);
+    return append2(a, b);
   }
 }
 
@@ -5083,12 +4571,14 @@ var SystemRequestedShutdown = class extends CustomType {
 
 // build/dev/javascript/lustre/lustre/component.mjs
 var Config2 = class extends CustomType {
-  constructor(open_shadow_root, adopt_styles, attributes, properties, is_form_associated, on_form_autofill, on_form_reset, on_form_restore) {
+  constructor(open_shadow_root, adopt_styles, delegates_focus, attributes, properties, contexts, is_form_associated, on_form_autofill, on_form_reset, on_form_restore) {
     super();
     this.open_shadow_root = open_shadow_root;
     this.adopt_styles = adopt_styles;
+    this.delegates_focus = delegates_focus;
     this.attributes = attributes;
     this.properties = properties;
+    this.contexts = contexts;
     this.is_form_associated = is_form_associated;
     this.on_form_autofill = on_form_autofill;
     this.on_form_reset = on_form_reset;
@@ -5097,16 +4587,18 @@ var Config2 = class extends CustomType {
 };
 function new$6(options) {
   let init2 = new Config2(
-    false,
     true,
-    empty_dict(),
-    empty_dict(),
+    true,
+    false,
+    empty_list,
+    empty_list,
+    empty_list,
     false,
     option_none,
     option_none,
     option_none
   );
-  return fold(
+  return fold2(
     options,
     init2,
     (config, option) => {
@@ -5116,13 +4608,7 @@ function new$6(options) {
 }
 
 // build/dev/javascript/lustre/lustre/runtime/client/spa.ffi.mjs
-var Spa = class _Spa {
-  static start({ init: init2, update: update3, view: view2 }, selector, flags) {
-    if (!is_browser()) return new Error(new NotABrowser());
-    const root3 = selector instanceof HTMLElement ? selector : document().querySelector(selector);
-    if (!root3) return new Error(new ElementNotFound(selector));
-    return new Ok(new _Spa(root3, init2(flags), update3, view2));
-  }
+var Spa = class {
   #runtime;
   constructor(root3, [init2, effects], update3, view2) {
     this.#runtime = new Runtime(root3, [init2, effects], view2, update3);
@@ -5148,7 +4634,12 @@ var Spa = class _Spa {
     this.#runtime.emit(event4, data);
   }
 };
-var start = Spa.start;
+var start = ({ init: init2, update: update3, view: view2 }, selector, flags) => {
+  if (!is_browser()) return new Error(new NotABrowser());
+  const root3 = selector instanceof HTMLElement ? selector : document().querySelector(selector);
+  if (!root3) return new Error(new ElementNotFound(selector));
+  return new Ok(new Spa(root3, init2(flags), update3, view2));
+};
 
 // build/dev/javascript/lustre/lustre.mjs
 var App = class extends CustomType {
@@ -5237,55 +4728,6 @@ function on_input(msg) {
   );
 }
 
-// build/dev/javascript/gse/index.mjs
-function simple_nearest_string(str, list_str) {
-  if (list_str instanceof Empty) {
-    return toList([]);
-  } else {
-    let $ = list_str.tail;
-    if ($ instanceof Empty) {
-      let a = list_str.head;
-      let $1 = contains_string(a, str);
-      if ($1) {
-        return toList([a]);
-      } else {
-        return toList([]);
-      }
-    } else {
-      let a = list_str.head;
-      let rest = $;
-      return flatten(
-        toList([
-          simple_nearest_string(str, toList([a])),
-          simple_nearest_string(str, rest)
-        ])
-      );
-    }
-  }
-}
-function create_inverted_index(links) {
-  if (links instanceof Empty) {
-    return from_list(toList([["", toList([""])]]));
-  } else {
-    let $ = links.tail;
-    if ($ instanceof Empty) {
-      let a = links.head;
-      return from_list(
-        map(split2(a, " "), (x) => {
-          return [x, toList([a])];
-        })
-      );
-    } else {
-      let b = links.head;
-      let rest = $;
-      return merge(
-        create_inverted_index(toList([b])),
-        create_inverted_index(rest)
-      );
-    }
-  }
-}
-
 // build/dev/javascript/gse/gse.mjs
 var FILEPATH = "src/gse.gleam";
 var UserUpdatedName = class extends CustomType {
@@ -5297,7 +4739,90 @@ var UserUpdatedName = class extends CustomType {
 function init(_) {
   return "";
 }
+function update2(model, msg) {
+  let name = msg[0];
+  let $ = string_length(name) <= 50;
+  if ($) {
+    return name;
+  } else {
+    return model;
+  }
+}
 function view(model) {
+  let index_list_str = toList([
+    "(3890)",
+    "a",
+    "stranger,",
+    "(3177)",
+    "dick;",
+    "p.",
+    "(3997)",
+    "moli\xE8re",
+    "works",
+    "emma",
+    "whale",
+    "and",
+    "other",
+    "forster",
+    "gulliver's",
+    "william",
+    "room",
+    "(3443)",
+    "mary",
+    "april",
+    "melville",
+    "several",
+    "complete",
+    "wodehouse",
+    "the",
+    "frankenstein;",
+    "remote",
+    "elizabeth",
+    "mark",
+    "jeeves",
+    "twain",
+    "arnim",
+    "jonathan",
+    "jane",
+    "(3935)",
+    "mysterious",
+    "(4931)",
+    "(3608)",
+    "enchanted",
+    "swift",
+    "by",
+    "von",
+    "proposal",
+    "wollstonecraft",
+    "g.",
+    "of",
+    "view",
+    "herman",
+    "shakespeare",
+    "world",
+    "austen",
+    "(3388)",
+    "(3641)",
+    "m.",
+    "modern",
+    "with",
+    "(3279)",
+    "imaginary",
+    "prometheus",
+    "ho,",
+    "stories",
+    "moby",
+    "regions",
+    "e.",
+    "(3640)",
+    "travels",
+    "shelley",
+    "invalid",
+    "right",
+    "or,",
+    "modest",
+    "into"
+  ]);
   return div(
     toList([class$("p-32 mx-auto w-full max-w-2xl space-y-4")]),
     toList([
@@ -5322,49 +4847,12 @@ function view(model) {
       ),
       p(
         toList([]),
-        toList([
-          text3("Hello there, "),
-          text3(
-            join(
-              simple_nearest_string(
-                model,
-                toList(["Romaric ST", "Bernard Werber", "Xi Jinping"])
-              ),
-              "\n"
-            )
-          ),
-          text3("!")
-        ])
+        toList([text3("Hello there, "), text3("ici"), text3("!")])
       )
     ])
   );
 }
-var list_book_names = /* @__PURE__ */ toList([
-  "A Room with a View by E. M. Forster (4931)",
-  "Moby Dick; Or, The Whale by Herman Melville (3997)",
-  "Gulliver's Travels into Several Remote Regions of the World by Jonathan Swift (3935)",
-  "Emma by Jane Austen (3890)",
-  "The Complete Works of William Shakespeare by William Shakespeare (3641)",
-  "Frankenstein; Or, The Modern Prometheus by Mary Wollstonecraft Shelley (3640)",
-  "A Modest Proposal by Jonathan Swift (3608)",
-  "The Mysterious Stranger, and Other Stories by Mark Twain (3443)",
-  "Right Ho, Jeeves by P. G. Wodehouse (3388)",
-  "The Enchanted April by Elizabeth Von Arnim (3279)",
-  "The Imaginary Invalid by Moli\xE8re (3177)"
-]);
-function update2(model, msg) {
-  let inverted_index_dict = create_inverted_index(list_book_names);
-  let name = msg[0];
-  let $ = string_length(name) <= 50;
-  if ($) {
-    return name;
-  } else {
-    return join(simple_nearest_string(model, toList([])), "\n");
-  }
-}
 function main() {
-  let inverted_index_dict = create_inverted_index(list_book_names);
-  echo(inverted_index_dict, "src/gse.gleam", 30);
   let app = simple(init, update2, view);
   let $ = start3(app, "#app", void 0);
   if (!($ instanceof Ok)) {
@@ -5372,155 +4860,13 @@ function main() {
       "let_assert",
       FILEPATH,
       "gse",
-      32,
+      16,
       "main",
       "Pattern match failed, no pattern matched the value.",
-      {
-        value: $,
-        start: 1265,
-        end: 1314,
-        pattern_start: 1276,
-        pattern_end: 1281
-      }
+      { value: $, start: 422, end: 471, pattern_start: 433, pattern_end: 438 }
     );
   }
   return void 0;
-}
-function echo(value2, file, line) {
-  const grey = "\x1B[90m";
-  const reset_color = "\x1B[39m";
-  const file_line = `${file}:${line}`;
-  const string_value = echo$inspect(value2);
-  if (globalThis.process?.stderr?.write) {
-    const string5 = `${grey}${file_line}${reset_color}
-${string_value}
-`;
-    process.stderr.write(string5);
-  } else if (globalThis.Deno) {
-    const string5 = `${grey}${file_line}${reset_color}
-${string_value}
-`;
-    globalThis.Deno.stderr.writeSync(new TextEncoder().encode(string5));
-  } else {
-    const string5 = `${file_line}
-${string_value}`;
-    globalThis.console.log(string5);
-  }
-  return value2;
-}
-function echo$inspectString(str) {
-  let new_str = '"';
-  for (let i = 0; i < str.length; i++) {
-    let char = str[i];
-    if (char == "\n") new_str += "\\n";
-    else if (char == "\r") new_str += "\\r";
-    else if (char == "	") new_str += "\\t";
-    else if (char == "\f") new_str += "\\f";
-    else if (char == "\\") new_str += "\\\\";
-    else if (char == '"') new_str += '\\"';
-    else if (char < " " || char > "~" && char < "\xA0") {
-      new_str += "\\u{" + char.charCodeAt(0).toString(16).toUpperCase().padStart(4, "0") + "}";
-    } else {
-      new_str += char;
-    }
-  }
-  new_str += '"';
-  return new_str;
-}
-function echo$inspectDict(map4) {
-  let body = "dict.from_list([";
-  let first = true;
-  let key_value_pairs = [];
-  map4.forEach((value2, key) => {
-    key_value_pairs.push([key, value2]);
-  });
-  key_value_pairs.sort();
-  key_value_pairs.forEach(([key, value2]) => {
-    if (!first) body = body + ", ";
-    body = body + "#(" + echo$inspect(key) + ", " + echo$inspect(value2) + ")";
-    first = false;
-  });
-  return body + "])";
-}
-function echo$inspectCustomType(record) {
-  const props = globalThis.Object.keys(record).map((label2) => {
-    const value2 = echo$inspect(record[label2]);
-    return isNaN(parseInt(label2)) ? `${label2}: ${value2}` : value2;
-  }).join(", ");
-  return props ? `${record.constructor.name}(${props})` : record.constructor.name;
-}
-function echo$inspectObject(v) {
-  const name = Object.getPrototypeOf(v)?.constructor?.name || "Object";
-  const props = [];
-  for (const k of Object.keys(v)) {
-    props.push(`${echo$inspect(k)}: ${echo$inspect(v[k])}`);
-  }
-  const body = props.length ? " " + props.join(", ") + " " : "";
-  const head = name === "Object" ? "" : name + " ";
-  return `//js(${head}{${body}})`;
-}
-function echo$inspect(v) {
-  const t = typeof v;
-  if (v === true) return "True";
-  if (v === false) return "False";
-  if (v === null) return "//js(null)";
-  if (v === void 0) return "Nil";
-  if (t === "string") return echo$inspectString(v);
-  if (t === "bigint" || t === "number") return v.toString();
-  if (globalThis.Array.isArray(v))
-    return `#(${v.map(echo$inspect).join(", ")})`;
-  if (v instanceof List)
-    return `[${v.toArray().map(echo$inspect).join(", ")}]`;
-  if (v instanceof UtfCodepoint)
-    return `//utfcodepoint(${String.fromCodePoint(v.value)})`;
-  if (v instanceof BitArray) return echo$inspectBitArray(v);
-  if (v instanceof CustomType) return echo$inspectCustomType(v);
-  if (echo$isDict(v)) return echo$inspectDict(v);
-  if (v instanceof Set)
-    return `//js(Set(${[...v].map(echo$inspect).join(", ")}))`;
-  if (v instanceof RegExp) return `//js(${v})`;
-  if (v instanceof Date) return `//js(Date("${v.toISOString()}"))`;
-  if (v instanceof Function) {
-    const args = [];
-    for (const i of Array(v.length).keys())
-      args.push(String.fromCharCode(i + 97));
-    return `//fn(${args.join(", ")}) { ... }`;
-  }
-  return echo$inspectObject(v);
-}
-function echo$inspectBitArray(bitArray) {
-  let endOfAlignedBytes = bitArray.bitOffset + 8 * Math.trunc(bitArray.bitSize / 8);
-  let alignedBytes = bitArraySlice(
-    bitArray,
-    bitArray.bitOffset,
-    endOfAlignedBytes
-  );
-  let remainingUnalignedBits = bitArray.bitSize % 8;
-  if (remainingUnalignedBits > 0) {
-    let remainingBits = bitArraySliceToInt(
-      bitArray,
-      endOfAlignedBytes,
-      bitArray.bitSize,
-      false,
-      false
-    );
-    let alignedBytesArray = Array.from(alignedBytes.rawBuffer);
-    let suffix = `${remainingBits}:size(${remainingUnalignedBits})`;
-    if (alignedBytesArray.length === 0) {
-      return `<<${suffix}>>`;
-    } else {
-      return `<<${Array.from(alignedBytes.rawBuffer).join(", ")}, ${suffix}>>`;
-    }
-  } else {
-    return `<<${Array.from(alignedBytes.rawBuffer).join(", ")}>>`;
-  }
-}
-function echo$isDict(value2) {
-  try {
-    return value2 instanceof Dict;
-  } catch {
-    return false;
-  }
 }
 
 // build/.lustre/entry.mjs

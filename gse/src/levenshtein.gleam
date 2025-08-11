@@ -33,29 +33,35 @@ fn levenshtein_helper(a: List(String), b: List(String), len_a: Int, len_b: Int) 
     }
 }
 
-pub fn nearest_string_with_levenshtein_distance(req:String,list_str:List(String))->String
+pub fn nearest_str_with_lv_dist(req:String,list_str:List(String))->String
 {
-    //Check the return type of this variable
-    todo
+    let l = list.map(list_str,fn(x:String){#(levenshtein(req,x),x)})
+    let sorted_l = list.sort(l,by:fn(x,y){case x.0<y.0
+                                  {True->order.Lt
+                                  False->order.Gt}})
+    case list.first(sorted_l){
+        Ok(a)->a.1
+        _->""
+    }
 }
-// pub fn nearest_string_with_levenshtein_distance(req:String,list_str:List(String))->String
-// {
-//     let l = list.map(list_str,fn(x:String){#(levenshtein(req,x),x)})
-//     let sorted_l = list.sort(l,by:fn(x,y){case x.0<y.0
-//                                   {True->order.Lt
-//                                   False->order.Gt}})
-//     sorted_l[0]
-// }
 
+pub fn list_str_with_lv_distance(req:String,_len_list:Int,list_str:List(String))->List(String)
+{
+    let l = list.map(list_str,fn(x:String){#(levenshtein(req,x),x)})
+    let sorted_l = list.sort(l,by:fn(x,y){case x.0<y.0
+                                  {True->order.Lt
+                                  False->order.Gt}})
+    case list.first(sorted_l){
+        Ok(a)->[a.1]
+        _->[""]
+    }
+}
 
 // Example usage
 pub fn main() {
   let distance = levenshtein("kitten", "sitting")
   io.println(int.to_string(distance))
   let l: List(String) = ["Moby Dick","moby kich","feyman","wolle soyinka","philippe Simo","Moi, moche et méchant"]
-  let m = list.map(l,fn(x:String){#(levenshtein("moby",x),x)})
-  echo list.sort(m,by:fn(x,y){case x.0<y.0
-                                {True->order.Lt
-                                False->order.Gt}})
+  echo list_str_with_lv_distance("kick",3,l)
 
 }

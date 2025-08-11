@@ -6,8 +6,12 @@ import lustre/attribute
 import lustre/element.{type Element}
 import lustre/element/html
 import lustre/event
-import index
-import levenshtein
+// import lustre_pipes/attribute
+// import lustre_pipes/element.{type Element}
+// import lustre_pipes/element/html
+// import lustre_pipes/event
+//import index
+//import levenshtein
 
 // MAIN ------------------------------------------------------------------------
 
@@ -48,8 +52,9 @@ fn update(model: Model, msg: Msg) -> Model {
 
 // VIEW ------------------------------------------------------------------------
 fn view(model: Model) -> Element(Msg) {
-    let index_list_str : List(String) =["(3890)", "a", "stranger,", "(3177)", "dick;", "p.", "(3997)", "molière", "works", "emma", "whale", "and", "other", "forster", "gulliver's", "william", "room", "(3443)", "mary", "april", "melville", "several", "complete", "wodehouse", "the", "frankenstein;", "remote", "elizabeth", "mark", "jeeves", "twain", "arnim", "jonathan", "jane", "(3935)", "mysterious", "(4931)", "(3608)", "enchanted", "swift", "by", "von", "proposal", "wollstonecraft", "g.", "of", "view", "herman", "shakespeare", "world", "austen", "(3388)", "(3641)", "m.", "modern", "with", "(3279)", "imaginary", "prometheus", "ho,", "stories", "moby", "regions", "e.", "(3640)", "travels", "shelley", "invalid", "right", "or,", "modest", "into"]
-  html.div([attribute.class("p-32 mx-auto w-full max-w-2xl space-y-4")], [
+    let _index_list_str : List(String) =["(3890)", "a", "stranger,", "(3177)", "dick;", "p.", "(3997)", "molière", "works", "emma", "whale", "and", "other", "forster", "gulliver's", "william", "room", "(3443)", "mary", "april", "melville", "several", "complete", "wodehouse", "the", "frankenstein;", "remote", "elizabeth", "mark", "jeeves", "twain", "arnim", "jonathan", "jane", "(3935)", "mysterious", "(4931)", "(3608)", "enchanted", "swift", "by", "von", "proposal", "wollstonecraft", "g.", "of", "view", "herman", "shakespeare", "world", "austen", "(3388)", "(3641)", "m.", "modern", "with", "(3279)", "imaginary", "prometheus", "ho,", "stories", "moby", "regions", "e.", "(3640)", "travels", "shelley", "invalid", "right", "or,", "modest", "into"]
+    //echo string.join(levenshtein.nearest_string_with_levenshtein_distance("model",index_list_str),with:"\n")
+    html.div([attribute.class("p-32 mx-auto w-full max-w-2xl space-y-4")], [
     html.label([attribute.class("flex gap-2")], [
       html.span([], [html.text("Rechercher un bouquin : ")]),
       html.input([
@@ -61,9 +66,21 @@ fn view(model: Model) -> Element(Msg) {
     ]),
     html.p([], [
       html.text("Hello there, "),
-      //html.text(string.join(levenshtein.nearest_string_with_levenshtein_distance(model,index_list_str),with:"\n")),
+     // html.text(string.join(levenshtein.nearest_string_with_levenshtein_distance(model,index_list_str),with:"\n")),
       html.text("ici"),
       html.text("!"),
     ])
   ])
+  // html.div()
+  // |> attribute.class("h-full w-full flex justify-center items-center")
+  // |> element.children([
+  //   html.button()
+  //     |> event.on_click(Decrement)
+  //     |> element.text_content("-"),
+  //   html.p()
+  //     |> element.text_content(count),
+  //   html.button()
+  //     |> event.on_click(Increment)
+  //     |> element.text_content("+"),
+  // ])
 }
